@@ -1,0 +1,29 @@
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class ProcurementRequestResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'itemCode' => $this->item_code,
+            'itemName' => $this->item_name,
+            'quantity' => (int) $this->quantity,
+            'unit' => $this->unit,
+            'unitPrice' => (int) $this->unit_price,
+            'totalAmount' => (int) $this->total_amount,
+            'reason' => $this->reason,
+            'requestedBy' => $this->requested_by,
+            'requestedAt' => optional($this->requested_at)->format('Y-m-d H:i:s'),
+            'status' => $this->status,
+            'financeApproval' => $this->finance_approval,
+            'managementApproval' => $this->management_approval,
+            'receivedAt' => optional($this->received_at)->format('Y-m-d H:i:s'),
+        ];
+    }
+}

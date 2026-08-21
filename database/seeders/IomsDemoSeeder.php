@@ -25,12 +25,13 @@ class IomsDemoSeeder extends Seeder
         $users = [
             ['id' => 'USR-01', 'name' => 'Budi Santoso', 'email' => 'superadmin@isp-ops.net', 'role' => 'superadmin', 'role_title' => 'Super Administrator', 'division' => 'IT & System Development', 'phone' => '081234567890'],
             ['id' => 'USR-02', 'name' => 'Ir. Hendra Gunawan', 'email' => 'hendra.direksi@isp-ops.net', 'role' => 'management', 'role_title' => 'Direktur Operasional & Bisnis', 'division' => 'Executive Management', 'phone' => '081298765432'],
-            ['id' => 'USR-03', 'name' => 'Ahmad Fauzi', 'email' => 'noc.lead@isp-ops.net', 'role' => 'noc', 'role_title' => 'Senior Network Engineer', 'division' => 'Network Operation Center', 'phone' => '081388776655'],
-            ['id' => 'USR-04', 'name' => 'Rina Kartika', 'email' => 'helpdesk@isp-ops.net', 'role' => 'helpdesk', 'role_title' => 'Customer Care & Helpdesk', 'division' => 'Customer Service & Helpdesk', 'phone' => '081911223344'],
-            ['id' => 'USR-05', 'name' => 'Supriyadi', 'email' => 'lead.tech@isp-ops.net', 'role' => 'lead_tech', 'role_title' => 'Kepala Teknisi Lapangan', 'division' => 'Field Operations & Dispatch', 'phone' => '082133445566'],
-            ['id' => 'USR-06', 'name' => 'Bambang Irawan', 'email' => 'teknisi.bambang@isp-ops.net', 'role' => 'field_tech', 'role_title' => 'Teknisi Instalasi & FO', 'division' => 'Field Operations', 'phone' => '085711223399'],
-            ['id' => 'USR-07', 'name' => 'Dinda Permata', 'email' => 'finance.billing@isp-ops.net', 'role' => 'finance', 'role_title' => 'Finance & Billing Specialist', 'division' => 'Finance, Billing & Accounting', 'phone' => '087811992288'],
-            ['id' => 'USR-08', 'name' => 'Joko Widodo', 'email' => 'gudang.inventory@isp-ops.net', 'role' => 'inventory', 'role_title' => 'Logistik & Asset Inventory', 'division' => 'Warehouse & Asset Logistics', 'phone' => '081244556677'],
+            ['id' => 'USR-03', 'name' => 'Raka Pratama', 'email' => 'sales@isp-ops.net', 'role' => 'sales', 'role_title' => 'Sales Fiber Consultant', 'division' => 'Sales & Acquisition', 'phone' => '081355667788'],
+            ['id' => 'USR-04', 'name' => 'Ahmad Fauzi', 'email' => 'noc.lead@isp-ops.net', 'role' => 'noc', 'role_title' => 'Senior Network Engineer', 'division' => 'Network Operation Center', 'phone' => '081388776655'],
+            ['id' => 'USR-05', 'name' => 'Rina Kartika', 'email' => 'helpdesk@isp-ops.net', 'role' => 'helpdesk', 'role_title' => 'Customer Care & Helpdesk', 'division' => 'Customer Service & Helpdesk', 'phone' => '081911223344'],
+            ['id' => 'USR-06', 'name' => 'Supriyadi', 'email' => 'lead.tech@isp-ops.net', 'role' => 'lead_tech', 'role_title' => 'Kepala Teknisi Lapangan', 'division' => 'Field Operations & Dispatch', 'phone' => '082133445566'],
+            ['id' => 'USR-07', 'name' => 'Bambang Irawan', 'email' => 'teknisi.bambang@isp-ops.net', 'role' => 'field_tech', 'role_title' => 'Teknisi Instalasi & FO', 'division' => 'Field Operations', 'phone' => '085711223399'],
+            ['id' => 'USR-08', 'name' => 'Dinda Permata', 'email' => 'finance.billing@isp-ops.net', 'role' => 'finance', 'role_title' => 'Finance & Billing Specialist', 'division' => 'Finance, Billing & Accounting', 'phone' => '087811992288'],
+            ['id' => 'USR-09', 'name' => 'Joko Widodo', 'email' => 'gudang.inventory@isp-ops.net', 'role' => 'inventory', 'role_title' => 'Logistik & Asset Inventory', 'division' => 'Warehouse & Asset Logistics', 'phone' => '081244556677'],
         ];
 
         foreach ($users as $user) {
@@ -47,6 +48,7 @@ class IomsDemoSeeder extends Seeder
                 'items' => [
                     ['role' => 'superadmin', 'roleTitle' => 'Super Administrator', 'division' => 'IT & System Development'],
                     ['role' => 'management', 'roleTitle' => 'Direktur Operasional & Bisnis', 'division' => 'Executive Management'],
+                    ['role' => 'sales', 'roleTitle' => 'Sales Fiber Consultant', 'division' => 'Sales & Acquisition'],
                     ['role' => 'noc', 'roleTitle' => 'Senior Network Engineer', 'division' => 'Network Operation Center'],
                     ['role' => 'helpdesk', 'roleTitle' => 'Customer Care & Helpdesk', 'division' => 'Customer Service & Helpdesk'],
                     ['role' => 'lead_tech', 'roleTitle' => 'Kepala Teknisi Lapangan', 'division' => 'Field Operations & Dispatch'],

@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AssignWorkOrderRequest;
+use App\Http\Requests\InstallationNocVerifyRequest;
 use App\Http\Requests\SubmitFieldReportRequest;
 use App\Http\Resources\WorkOrderResource;
 use App\Models\WorkOrder;
 use App\Services\WorkflowService;
+
 class WorkOrderController extends Controller
 {
     public function __construct(private readonly WorkflowService $workflow) {}
@@ -22,8 +24,23 @@ class WorkOrderController extends Controller
         return WorkOrderResource::make($this->workflow->assignWorkOrder($workOrder, $request->string('tech_id')->toString(), $request->user()));
     }
 
+    public function leadAssign(AssignWorkOrderRequest $request, WorkOrder $workOrder)
+    {
+        return $this->assignTech($request, $workOrder);
+    }
+
     public function submitReport(SubmitFieldReportRequest $request, WorkOrder $workOrder)
     {
         return WorkOrderResource::make($this->workflow->submitFieldReport($workOrder, $request->validated(), $request->user()));
+    }
+
+    public function submitInstallationReport(SubmitFieldReportRequest $request, WorkOrder $workOrder)
+    {
+        return $this->submitReport($request, $workOrder);
+    }
+
+    public function nocFinalVerify(InstallationNocVerifyRequest $request, WorkOrder $workOrder)
+    {
+        return WorkOrderResource::make($this->workflow->nocFinalVerifyInstallation($workOrder, $request->validated(), $request->user()));
     }
 }

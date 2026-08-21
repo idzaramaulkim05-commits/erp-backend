@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\NetworkOdpController;
 use App\Http\Controllers\Api\ProcurementController;
+use App\Http\Controllers\Api\ServiceRegistrationController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\UserController;
@@ -35,6 +36,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('customers', [CustomerController::class, 'store'])->middleware('role:superadmin,helpdesk,inventory');
     Route::patch('customers/{customer}/status', [CustomerController::class, 'updateStatus'])->middleware('role:superadmin,finance');
 
+    Route::get('service-registrations', [ServiceRegistrationController::class, 'index']);
+    Route::post('service-registrations', [ServiceRegistrationController::class, 'store'])->middleware('role:superadmin,sales');
+    Route::get('service-registrations/{serviceRegistration}', [ServiceRegistrationController::class, 'show']);
+    Route::post('service-registrations/{serviceRegistration}/submit', [ServiceRegistrationController::class, 'submit'])->middleware('role:superadmin,sales');
+    Route::post('service-registrations/{serviceRegistration}/finance-approve', [ServiceRegistrationController::class, 'financeApprove'])->middleware('role:superadmin,finance');
+    Route::post('service-registrations/{serviceRegistration}/finance-reject', [ServiceRegistrationController::class, 'financeReject'])->middleware('role:superadmin,finance');
+    Route::post('service-registrations/{serviceRegistration}/generate-pppoe', [ServiceRegistrationController::class, 'generatePppoe'])->middleware('role:superadmin,noc');
+    Route::post('service-registrations/{serviceRegistration}/noc-approve', [ServiceRegistrationController::class, 'nocApprove'])->middleware('role:superadmin,noc');
+    Route::post('service-registrations/{serviceRegistration}/noc-reject', [ServiceRegistrationController::class, 'nocReject'])->middleware('role:superadmin,noc');
+    Route::post('service-registrations/{serviceRegistration}/create-work-order', [ServiceRegistrationController::class, 'createWorkOrder'])->middleware('role:superadmin,noc');
+
     Route::get('tickets', [TicketController::class, 'index']);
     Route::post('tickets', [TicketController::class, 'store'])->middleware('role:superadmin,helpdesk');
     Route::post('tickets/{ticket}/remote-resolve', [TicketController::class, 'remoteResolve'])->middleware('role:superadmin,noc');
@@ -44,7 +56,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('work-orders', [WorkOrderController::class, 'index']);
     Route::post('work-orders/{workOrder}/assign-tech', [WorkOrderController::class, 'assignTech'])->middleware('role:superadmin,lead_tech');
+    Route::post('work-orders/{workOrder}/lead-assign', [WorkOrderController::class, 'leadAssign'])->middleware('role:superadmin,lead_tech');
     Route::post('work-orders/{workOrder}/submit-report', [WorkOrderController::class, 'submitReport'])->middleware('role:superadmin,field_tech,lead_tech');
+    Route::post('work-orders/{workOrder}/submit-installation-report', [WorkOrderController::class, 'submitInstallationReport'])->middleware('role:superadmin,field_tech,lead_tech');
+    Route::post('work-orders/{workOrder}/noc-final-verify', [WorkOrderController::class, 'nocFinalVerify'])->middleware('role:superadmin,noc');
 
     Route::get('inventory', [InventoryController::class, 'index']);
 

@@ -10,6 +10,7 @@ use App\Models\InventoryItem;
 use App\Models\NetworkOdp;
 use App\Models\NetworkOdpPort;
 use App\Models\ProcurementRequest;
+use App\Models\ServiceRegistration;
 use App\Models\StockMovement;
 use App\Models\TroubleTicket;
 use App\Models\User;
@@ -20,6 +21,234 @@ use Illuminate\Support\Str;
 
 class WorkflowService
 {
+    public function createServiceRegistration(array $payload, User $actor): ServiceRegistration
+    {
+        $registration = ServiceRegistration::query()->create([
+            'id' => $this->nextCode('SR', ServiceRegistration::query()->count() + 1),
+            'name' => $payload['name'],
+            'nik' => $payload['nik'],
+            'phone' => $payload['phone'],
+            'address' => $payload['address'],
+            'region' => $payload['region'],
+            'package_plan' => $payload['package_plan'],
+            'monthly_fee' => $payload['monthly_fee'],
+            'odp_id' => $payload['odp_id'],
+            'status' => 'draft',
+            'finance_status' => 'pending',
+            'noc_status' => 'pending',
+            'requested_by_id' => $actor->id,
+            'meta' => ['created_by' => $actor->id],
+        ]);
+
+        $this->log($actor, 'Service Registration Drafted', $registration->id, 'Draft registrasi pasang baru dibuat oleh sales.', 'info');
+
+        return $registration->fresh();
+    }
+
+    public function submitServiceRegistration(ServiceRegistration $registration, User $actor): ServiceRegistration
+    {
+        $registration->update([
+            'status' => 'pending_finance',
+            'finance_status' => 'pending',
+        ]);
+
+        $this->log($actor, 'Service Registration Submitted', $registration->id, 'Registrasi baru dikirim ke finance untuk direview.', 'warning');
+
+        return $registration->fresh();
+    }
+
+    public function financeApproveServiceRegistration(ServiceRegistration $registration, User $actor, ?string $notes = null): ServiceRegistration
+    {
+        $registration->update([
+            'status' => 'pending_noc',
+            'finance_status' => 'approved',
+            'finance_notes' => $notes,
+            'finance_approved_by' => $actor->name,
+            'finance_approved_at' => Carbon::now(),
+        ]);
+
+        $this->log($actor, 'Finance Approved Registration', $registration->id, $notes ?? 'Registrasi baru disetujui finance.', 'success');
+
+        return $registration->fresh();
+    }
+
+    public function financeRejectServiceRegistration(ServiceRegistration $registration, User $actor, ?string $notes = null): ServiceRegistration
+    {
+        $registration->update([
+            'status' => 'finance_rejected',
+            'finance_status' => 'rejected',
+            'finance_notes' => $notes,
+            'finance_approved_by' => $actor->name,
+            'finance_approved_at' => Carbon::now(),
+        ]);
+
+        $this->log($actor, 'Finance Rejected Registration', $registration->id, $notes ?? 'Registrasi baru ditolak finance.', 'warning');
+
+        return $registration->fresh();
+    }
+
+    public function generateServiceRegistrationPppoe(ServiceRegistration $registration, User $actor): ServiceRegistration
+    {
+        $username = $registration->pppoe_username ?: strtolower(str_replace('-', '', $registration->id)).'@isp.net';
+        $password = $registration->pppoe_password ?: str_pad((string) random_int(0, 9999999999), 10, '0', STR_PAD_LEFT);
+
+        $registration->update([
+            'pppoe_username' => $username,
+            'pppoe_password' => $password,
+            'generated_at' => Carbon::now(),
+        ]);
+
+        $this->log($actor, 'Generated PPPoE Draft', $registration->id, 'Username dan password PPPoE internal berhasil dibuat.', 'info');
+
+        return $registration->fresh();
+    }
+
+    public function nocApproveServiceRegistration(ServiceRegistration $registration, User $actor, ?string $notes = null, ?int $portCandidate = null): ServiceRegistration
+    {
+        return DB::transaction(function () use ($registration, $actor, $notes, $portCandidate) {
+            $registration = $this->generateServiceRegistrationPppoe($registration, $actor);
+            $odp = NetworkOdp::query()->with('ports')->findOrFail($registration->odp_id);
+
+            $port = $portCandidate
+                ? $odp->ports()->where('port_number', $portCandidate)->where('status', 'empty')->first()
+                : $odp->ports()->where('status', 'empty')->orderBy('port_number')->first();
+
+            abort_unless($port, 422, 'ODP tidak memiliki port kosong untuk registrasi ini.');
+
+            $registration->update([
+                'status' => 'noc_approved',
+                'noc_status' => 'approved',
+                'noc_notes' => $notes,
+                'noc_approved_by' => $actor->name,
+                'noc_approved_at' => Carbon::now(),
+                'odp_port_candidate' => $port->port_number,
+            ]);
+
+            $this->log($actor, 'NOC Approved Registration', $registration->id, $notes ?? 'Registrasi baru lolos validasi teknis NOC.', 'success');
+
+            return $registration->fresh();
+        });
+    }
+
+    public function nocRejectServiceRegistration(ServiceRegistration $registration, User $actor, ?string $notes = null): ServiceRegistration
+    {
+        $registration->update([
+            'status' => 'noc_rejected',
+            'noc_status' => 'rejected',
+            'noc_notes' => $notes,
+            'noc_approved_by' => $actor->name,
+            'noc_approved_at' => Carbon::now(),
+        ]);
+
+        $this->log($actor, 'NOC Rejected Registration', $registration->id, $notes ?? 'Registrasi baru ditolak NOC.', 'warning');
+
+        return $registration->fresh();
+    }
+
+    public function createInstallationWorkOrderFromRegistration(ServiceRegistration $registration, User $actor): ServiceRegistration
+    {
+        return DB::transaction(function () use ($registration, $actor) {
+            abort_unless($registration->finance_status === 'approved', 422, 'Registrasi belum lolos approval finance.');
+            abort_unless($registration->noc_status === 'approved', 422, 'Registrasi belum lolos approval NOC.');
+
+            if ($registration->work_order_id) {
+                return $registration->fresh();
+            }
+
+            $odp = NetworkOdp::query()->with('ports')->findOrFail($registration->odp_id);
+            $port = $odp->ports()
+                ->where('status', 'empty')
+                ->when($registration->odp_port_candidate, fn ($query) => $query->where('port_number', $registration->odp_port_candidate))
+                ->orderBy('port_number')
+                ->first();
+
+            abort_unless($port, 422, 'Port ODP yang disetujui sudah tidak tersedia.');
+
+            $customerId = $this->nextCode('CUST', Customer::query()->count() + 1042);
+            $customer = Customer::query()->create([
+                'id' => $customerId,
+                'name' => $registration->name,
+                'nik' => $registration->nik,
+                'phone' => $registration->phone,
+                'address' => $registration->address,
+                'region' => $registration->region,
+                'package_plan' => $registration->package_plan,
+                'monthly_fee' => $registration->monthly_fee,
+                'pppoe_username' => $registration->pppoe_username,
+                'pppoe_password' => $registration->pppoe_password,
+                'ip_address' => '10.20.'.random_int(10, 40).'.'.random_int(10, 200),
+                'ont_brand' => 'ZTE',
+                'ont_model' => 'ZTE F609 V3',
+                'ont_serial_number' => 'ONT'.random_int(100000, 999999),
+                'odc_id' => $odp->odc_id,
+                'odp_id' => $odp->id,
+                'odp_port' => $port->port_number,
+                'fiber_core_color' => $odp->fiber_core_color,
+                'optical_power_dbm' => -21.0,
+                'status' => 'active',
+                'billing_status' => 'pending',
+                'billing_due_date' => Carbon::now()->addDays(10)->toDateString(),
+                'installed_date' => Carbon::now()->toDateString(),
+                'assigned_technician_id' => User::query()->where('role', 'field_tech')->value('id'),
+                'meta' => ['created_by_registration' => $registration->id],
+            ]);
+
+            $port->update([
+                'customer_id' => $customer->id,
+                'customer_name' => $customer->name,
+                'pppoe_username' => $customer->pppoe_username,
+                'optical_power_dbm' => $customer->optical_power_dbm,
+                'status' => 'active',
+            ]);
+
+            $odp->update([
+                'used_ports' => $odp->ports()->whereIn('status', ['active', 'faulty'])->count(),
+            ]);
+
+            BillingRecord::query()->create([
+                'customer_id' => $customer->id,
+                'status' => $customer->billing_status,
+                'amount' => $customer->monthly_fee,
+                'due_date' => Carbon::parse($customer->billing_due_date)->toDateString(),
+                'paid_at' => null,
+                'notes' => 'Service registration conversion',
+            ]);
+
+            $workOrder = WorkOrder::query()->create([
+                'id' => $this->nextCode('WO', WorkOrder::query()->count() + 400),
+                'type' => 'installation',
+                'customer_id' => $customer->id,
+                'customer_name' => $customer->name,
+                'customer_phone' => $customer->phone,
+                'address' => $customer->address,
+                'region' => $customer->region,
+                'odp_id' => $customer->odp_id,
+                'assigned_lead' => User::query()->where('role', 'lead_tech')->value('name') ?? 'Lead Tech',
+                'assigned_tech_id' => null,
+                'assigned_tech_name' => null,
+                'service_registration_id' => $registration->id,
+                'status' => 'pending_lead_assignment',
+                'scheduled_date' => Carbon::now()->addDay()->format('Y-m-d 09:00'),
+                'package_plan' => $customer->package_plan,
+                'required_materials' => [
+                    ['itemName' => 'Modem ONT', 'quantity' => 1, 'unit' => 'Unit'],
+                    ['itemName' => 'Patch Cord SC-UPC 3M', 'quantity' => 1, 'unit' => 'Pcs'],
+                    ['itemName' => 'Drop Cable Fiber 1 Core', 'quantity' => 100, 'unit' => 'Meter'],
+                ],
+            ]);
+
+            $registration->update([
+                'status' => 'ready_for_dispatch',
+                'customer_id' => $customer->id,
+                'work_order_id' => $workOrder->id,
+            ]);
+
+            $this->log($actor, 'Created Installation Work Order', $registration->id, "WO {$workOrder->id} diterbitkan dari registrasi baru.", 'success');
+
+            return $registration->fresh();
+        });
+    }
+
     public function registerCustomer(array $payload, User $actor): Customer
     {
         return DB::transaction(function () use ($payload, $actor) {
@@ -237,6 +466,12 @@ class WorkflowService
             'status' => 'assigned',
         ]);
 
+        if ($workOrder->service_registration_id) {
+            ServiceRegistration::query()
+                ->whereKey($workOrder->service_registration_id)
+                ->update(['status' => 'ready_for_dispatch']);
+        }
+
         $this->log($actor, 'Assigned Work Order', $workOrder->id, "WO dialokasikan ke {$tech->name}.", 'info');
 
         return $workOrder->fresh();
@@ -263,8 +498,10 @@ class WorkflowService
                 }
             }
 
+            $nextStatus = $workOrder->service_registration_id ? 'waiting_noc_activation' : 'sop_submitted';
+
             $workOrder->update([
-                'status' => 'sop_submitted',
+                'status' => $nextStatus,
                 'used_materials' => $usedMaterials,
                 'photos' => [
                     'ktp' => $report['photo_ktp'] ?? null,
@@ -290,6 +527,18 @@ class WorkflowService
                         'technicianSignature' => $report['signature'] ?? null,
                     ],
                 ]);
+            }
+
+            if ($workOrder->service_registration_id) {
+                ServiceRegistration::query()
+                    ->whereKey($workOrder->service_registration_id)
+                    ->update([
+                        'status' => 'field_submitted',
+                        'meta' => array_merge(
+                            ServiceRegistration::query()->whereKey($workOrder->service_registration_id)->value('meta') ?? [],
+                            ['last_field_report_at' => Carbon::now()->format('Y-m-d H:i:s')]
+                        ),
+                    ]);
             }
 
             $this->log($actor, 'Submitted Field Report', $workOrder->id, $report['action_taken'], 'success');
@@ -345,6 +594,45 @@ class WorkflowService
         $this->log($actor, 'NOC Closed Ticket', $ticket->id, $payload['notes'] ?? 'Ticket closed.', 'success');
 
         return $ticket->fresh();
+    }
+
+    public function nocFinalVerifyInstallation(WorkOrder $workOrder, array $payload, User $actor): WorkOrder
+    {
+        abort_unless($workOrder->type === 'installation', 422, 'Final verify NOC hanya untuk work order instalasi.');
+
+        return DB::transaction(function () use ($workOrder, $payload, $actor) {
+            $workOrder->update([
+                'status' => 'completed',
+                'noc_activated' => true,
+                'completed_at' => Carbon::now(),
+                'final_verification' => [
+                    'verified' => true,
+                    'verifiedBy' => $actor->name,
+                    'verifiedAt' => Carbon::now()->format('Y-m-d H:i:s'),
+                    'opticalDbmReading' => $payload['optical_dbm_reading'],
+                    'pppoeSessionActive' => $payload['pppoe_session_active'],
+                    'rxPowerThresholdPassed' => $payload['rx_power_threshold_passed'],
+                    'notes' => $payload['notes'] ?? null,
+                ],
+            ]);
+
+            Customer::query()->whereKey($workOrder->customer_id)->update([
+                'optical_power_dbm' => $payload['optical_dbm_reading'],
+                'status' => 'active',
+            ]);
+
+            if ($workOrder->service_registration_id) {
+                ServiceRegistration::query()->whereKey($workOrder->service_registration_id)->update([
+                    'status' => 'completed',
+                    'noc_status' => 'approved',
+                    'noc_notes' => $payload['notes'] ?? null,
+                ]);
+            }
+
+            $this->log($actor, 'NOC Final Verified Installation', $workOrder->id, $payload['notes'] ?? 'Instalasi selesai diverifikasi NOC.', 'success');
+
+            return $workOrder->fresh();
+        });
     }
 
     public function createProcurement(array $payload, User $actor): ProcurementRequest

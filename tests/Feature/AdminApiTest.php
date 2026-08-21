@@ -26,7 +26,7 @@ class AdminApiTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/admin/overview')
             ->assertOk()
-            ->assertJsonPath('data.totalUsers', 8);
+            ->assertJsonPath('data.totalUsers', 9);
 
         $createdUser = $this->withHeader('Authorization', 'Bearer '.$token)
             ->postJson('/api/admin/users', [
@@ -94,7 +94,7 @@ class AdminApiTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/admin/sessions')
             ->assertOk()
-            ->assertJsonCount(9, 'data');
+            ->assertJsonCount(10, 'data');
 
         $this->assertDatabaseHas('audit_logs', ['action' => 'Create User', 'target' => 'admin.data@isp-ops.net']);
         $this->assertDatabaseHas('audit_logs', ['action' => 'Update Master Data', 'target' => 'regions']);

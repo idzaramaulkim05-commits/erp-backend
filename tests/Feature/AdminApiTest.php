@@ -74,7 +74,42 @@ class AdminApiTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/admin/master-data')
             ->assertOk()
-            ->assertJsonCount(5, 'data');
+            ->assertJsonCount(4, 'data');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/admin/roles')
+            ->assertOk()
+            ->assertJsonCount(9, 'data');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/admin/roles', [
+                'role' => 'customer_success',
+                'role_title' => 'Customer Success Specialist',
+                'division' => 'Customer Experience',
+                'description' => 'Monitoring onboarding dan follow up pelanggan aktif.',
+                'sort_order' => 10,
+                'is_active' => true,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.role', 'customer_success');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/admin/roles/helpdesk', [
+                'role_title' => 'Helpdesk Internal Ops',
+                'division' => 'Customer Service Internal',
+                'description' => 'Intake tiket dan koordinasi aduan pelanggan.',
+                'sort_order' => 5,
+                'is_active' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.roleTitle', 'Helpdesk Internal Ops');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->patchJson('/api/admin/roles/customer_success/status', [
+                'is_active' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.isActive', false);
 
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->putJson('/api/admin/master-data/regions', [
@@ -87,6 +122,107 @@ class AdminApiTest extends TestCase
             ->assertJsonPath('data.key', 'regions');
 
         $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/admin/modules')
+            ->assertOk()
+            ->assertJsonPath('data.modules.0.key', 'dashboard');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/admin/modules', [
+                'key' => 'customer_portal',
+                'label' => 'Customer Portal',
+                'description' => 'Modul portal pelanggan untuk fase berikutnya.',
+                'navigation_head_key' => 'operasional',
+                'order' => 11,
+                'route_target' => '/app/customer-portal',
+                'quick_action' => null,
+                'view_formats' => ['table'],
+                'is_active' => true,
+                'show_in_navbar' => true,
+                'admin_only_dashboard' => false,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.key', 'customer_portal');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/admin/modules', [
+                'key' => 'admin_module_roles',
+                'label' => 'Modul To Role',
+                'description' => 'Mapping modul untuk role.',
+                'navigation_head_key' => 'administrasi',
+                'order' => 8,
+                'route_target' => '/app/admin/module-roles',
+                'quick_action' => null,
+                'view_formats' => ['table'],
+                'is_active' => true,
+            ])
+            ->assertStatus(422);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/admin/modules', [
+                'key' => 'broken_route_module',
+                'label' => 'Broken Route Module',
+                'description' => 'Harus ditolak karena route bukan path internal.',
+                'navigation_head_key' => 'operasional',
+                'order' => 12,
+                'route_target' => 'helpdesk',
+                'quick_action' => null,
+                'view_formats' => ['table'],
+                'is_active' => true,
+                'show_in_navbar' => true,
+                'admin_only_dashboard' => false,
+            ])
+            ->assertStatus(422);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/admin/modules/helpdesk', [
+                'label' => 'Helpdesk Internal',
+                'description' => 'Aduan dan intake tiket internal.',
+                'navigation_head_key' => 'operasional',
+                'order' => 2,
+                'route_target' => '/app/helpdesk',
+                'quick_action' => 'new_ticket',
+                'view_formats' => ['table', 'grid'],
+                'is_active' => true,
+                'show_in_navbar' => true,
+                'admin_only_dashboard' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.label', 'Helpdesk Internal');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/admin/module-role-mappings')
+            ->assertOk()
+            ->assertJsonPath('data.roles.0.role', 'superadmin');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/admin/module-role-mappings/helpdesk', [
+                'mappings' => [
+                    ['module_key' => 'helpdesk', 'is_visible' => true, 'order_override' => 1],
+                    ['module_key' => 'kanban', 'is_visible' => true, 'order_override' => 2],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/admin/navigation-config')
+            ->assertOk()
+            ->assertJsonPath('data.heads.0.key', 'dashboards');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/admin/navigation-config', [
+                'heads' => [
+                    ['key' => 'dashboards', 'label' => 'Dashboards', 'order' => 1, 'is_active' => true],
+                    ['key' => 'operasional', 'label' => 'Operasional', 'order' => 2, 'is_active' => true],
+                    ['key' => 'koordinasi', 'label' => 'Koordinasi', 'order' => 3, 'is_active' => true],
+                    ['key' => 'infrastruktur', 'label' => 'Infrastruktur', 'order' => 4, 'is_active' => true],
+                    ['key' => 'administrasi', 'label' => 'Administrasi Sistem', 'order' => 5, 'is_active' => true],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.heads.4.key', 'administrasi');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/admin/mappings')
             ->assertOk()
             ->assertJsonPath('data.networkSummary.totalOdps', 1);
@@ -97,6 +233,7 @@ class AdminApiTest extends TestCase
             ->assertJsonCount(10, 'data');
 
         $this->assertDatabaseHas('audit_logs', ['action' => 'Create User', 'target' => 'admin.data@isp-ops.net']);
+        $this->assertDatabaseHas('roles', ['key' => 'customer_success', 'is_active' => false]);
         $this->assertDatabaseHas('audit_logs', ['action' => 'Update Master Data', 'target' => 'regions']);
     }
 

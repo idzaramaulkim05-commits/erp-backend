@@ -2,10 +2,15 @@
 
 use App\Http\Controllers\Api\AdminMappingController;
 use App\Http\Controllers\Api\AdminMasterDataController;
+use App\Http\Controllers\Api\AdminModuleController;
+use App\Http\Controllers\Api\AdminNavigationConfigController;
 use App\Http\Controllers\Api\AdminOverviewController;
+use App\Http\Controllers\Api\AdminRoleMetaController;
+use App\Http\Controllers\Api\AdminRoleModuleMappingController;
 use App\Http\Controllers\Api\AdminSessionController;
 use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AuthNavigationController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
@@ -26,6 +31,7 @@ Route::prefix('auth')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
+        Route::get('navigation', [AuthNavigationController::class, 'show']);
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('change-password', [AuthController::class, 'changePassword']);
     });
@@ -85,8 +91,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('users/{user}', [AdminUserController::class, 'update']);
         Route::post('users/{user}/reset-password', [AdminUserController::class, 'resetPassword']);
         Route::patch('users/{user}/status', [AdminUserController::class, 'updateStatus']);
+        Route::get('roles', [AdminRoleMetaController::class, 'index']);
+        Route::post('roles', [AdminRoleMetaController::class, 'store']);
+        Route::put('roles/{role}', [AdminRoleMetaController::class, 'update']);
+        Route::patch('roles/{role}/status', [AdminRoleMetaController::class, 'updateStatus']);
         Route::get('master-data', [AdminMasterDataController::class, 'index']);
         Route::put('master-data/{group}', [AdminMasterDataController::class, 'update']);
+        Route::get('modules', [AdminModuleController::class, 'index']);
+        Route::post('modules', [AdminModuleController::class, 'store']);
+        Route::put('modules/{moduleKey}', [AdminModuleController::class, 'update']);
+        Route::get('module-role-mappings', [AdminRoleModuleMappingController::class, 'index']);
+        Route::put('module-role-mappings/{role}', [AdminRoleModuleMappingController::class, 'update']);
+        Route::get('navigation-config', [AdminNavigationConfigController::class, 'index']);
+        Route::put('navigation-config', [AdminNavigationConfigController::class, 'update']);
         Route::get('mappings', [AdminMappingController::class, 'index']);
         Route::get('sessions', [AdminSessionController::class, 'index']);
     });

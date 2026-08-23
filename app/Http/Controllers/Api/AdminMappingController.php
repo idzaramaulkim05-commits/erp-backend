@@ -4,15 +4,24 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AdminMappingResource;
-use App\Models\AdminMasterDataGroup;
 use App\Models\NetworkOdp;
+use App\Models\Role;
 
 class AdminMappingController extends Controller
 {
     public function index()
     {
         $odps = NetworkOdp::query()->with('ports')->orderBy('id')->get();
-        $roleDivisionMap = AdminMasterDataGroup::query()->find('role_division_map');
+        $roleDivisionMap = Role::query()
+            ->orderBy('sort_order')
+            ->get()
+            ->map(fn (Role $role) => [
+                'role' => $role->key,
+                'roleTitle' => $role->label,
+                'division' => $role->division,
+                'description' => $role->description,
+                'isActive' => (bool) $role->is_active,
+            ]);
 
         return AdminMappingResource::make([
             'networkSummary' => [
@@ -22,7 +31,7 @@ class AdminMappingController extends Controller
                 'availablePorts' => $odps->sum('total_ports') - $odps->sum('used_ports'),
             ],
             'odps' => $odps,
-            'roleDivisionMap' => $roleDivisionMap?->items ?? [],
+            'roleDivisionMap' => $roleDivisionMap,
         ]);
     }
 }

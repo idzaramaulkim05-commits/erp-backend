@@ -9,6 +9,7 @@ use App\Http\Requests\AdminUpdateUserRequest;
 use App\Http\Requests\AdminUpdateUserStatusRequest;
 use App\Http\Resources\AdminUserResource;
 use App\Models\AuditLog;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -23,14 +24,15 @@ class AdminUserController extends Controller
     public function store(AdminStoreUserRequest $request)
     {
         $nextNumber = User::query()->count() + 1;
+        $role = Role::query()->findOrFail($request->string('role')->toString());
 
         $user = User::query()->create([
             'id' => 'USR-'.str_pad((string) $nextNumber, 2, '0', STR_PAD_LEFT),
             'name' => $request->string('name')->toString(),
             'email' => $request->string('email')->toString(),
-            'role' => $request->string('role')->toString(),
-            'role_title' => $request->string('role_title')->toString(),
-            'division' => $request->string('division')->toString(),
+            'role' => $role->key,
+            'role_title' => $role->label,
+            'division' => $role->division,
             'phone' => $request->input('phone'),
             'password' => $request->string('password')->toString(),
             'is_active' => $request->boolean('is_active', true),
@@ -45,13 +47,14 @@ class AdminUserController extends Controller
     public function update(AdminUpdateUserRequest $request, string $user)
     {
         $targetUser = User::query()->findOrFail($user);
+        $role = Role::query()->findOrFail($request->string('role')->toString());
 
         $targetUser->update([
             'name' => $request->string('name')->toString(),
             'email' => $request->string('email')->toString(),
-            'role' => $request->string('role')->toString(),
-            'role_title' => $request->string('role_title')->toString(),
-            'division' => $request->string('division')->toString(),
+            'role' => $role->key,
+            'role_title' => $role->label,
+            'division' => $role->division,
             'phone' => $request->input('phone'),
             'is_active' => $request->boolean('is_active'),
         ]);

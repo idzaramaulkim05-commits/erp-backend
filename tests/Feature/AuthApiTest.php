@@ -31,6 +31,13 @@ class AuthApiTest extends TestCase
             ->getJson('/api/auth/me')
             ->assertOk()
             ->assertJsonPath('data.id', 'USR-01');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/auth/navigation')
+            ->assertOk()
+            ->assertJsonPath('data.role', 'superadmin')
+            ->assertJsonPath('data.allowedModuleKeys.0', 'dashboard')
+            ->assertJsonMissing(['key' => 'admin_users']);
     }
 
     public function test_user_can_change_password_and_old_password_becomes_invalid(): void

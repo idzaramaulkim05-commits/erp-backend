@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\AdminMasterDataGroup;
+use App\Models\AppNavigationModule;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\InterDivisionTask;
@@ -10,7 +11,10 @@ use App\Models\InventoryItem;
 use App\Models\InventorySerial;
 use App\Models\NetworkOdp;
 use App\Models\NetworkOdpPort;
+use App\Models\NavigationHead;
 use App\Models\ProcurementRequest;
+use App\Models\Role;
+use App\Models\RoleModuleMapping;
 use App\Models\TroubleTicket;
 use App\Models\User;
 use App\Models\WorkOrder;
@@ -41,23 +45,26 @@ class IomsDemoSeeder extends Seeder
             );
         }
 
+        $roles = [
+            ['key' => 'superadmin', 'label' => 'Super Administrator', 'division' => 'IT & System Development', 'description' => 'Akses penuh ke dashboard admin sistem dan seluruh modul operasional.', 'sort_order' => 1],
+            ['key' => 'management', 'label' => 'Direktur Operasional & Bisnis', 'division' => 'Executive Management', 'description' => 'Dashboard analitik dan approval manajemen.', 'sort_order' => 2],
+            ['key' => 'sales', 'label' => 'Sales Fiber Consultant', 'division' => 'Sales & Acquisition', 'description' => 'Registrasi pelanggan baru dan handoff ke finance.', 'sort_order' => 3],
+            ['key' => 'noc', 'label' => 'Senior Network Engineer', 'division' => 'Network Operation Center', 'description' => 'Validasi teknis, PPPoE, dan final verify instalasi.', 'sort_order' => 4],
+            ['key' => 'helpdesk', 'label' => 'Customer Care & Helpdesk', 'division' => 'Customer Service & Helpdesk', 'description' => 'Intake aduan dan koordinasi tiket gangguan.', 'sort_order' => 5],
+            ['key' => 'lead_tech', 'label' => 'Kepala Teknisi Lapangan', 'division' => 'Field Operations & Dispatch', 'description' => 'Dispatch teknisi dan review SOP lapangan.', 'sort_order' => 6],
+            ['key' => 'field_tech', 'label' => 'Teknisi Instalasi & FO', 'division' => 'Field Operations', 'description' => 'Eksekusi work order on-site dan laporan teknisi.', 'sort_order' => 7],
+            ['key' => 'finance', 'label' => 'Finance & Billing Specialist', 'division' => 'Finance, Billing & Accounting', 'description' => 'Approval billing dan procurement finance.', 'sort_order' => 8],
+            ['key' => 'inventory', 'label' => 'Logistik & Asset Inventory', 'division' => 'Warehouse & Asset Logistics', 'description' => 'Gudang, stok, dan permintaan barang.', 'sort_order' => 9],
+        ];
+
+        foreach ($roles as $role) {
+            Role::query()->updateOrCreate(
+                ['key' => $role['key']],
+                [...$role, 'is_active' => true]
+            );
+        }
+
         $masterGroups = [
-            [
-                'key' => 'role_division_map',
-                'label' => 'Role & Division Mapping',
-                'items' => [
-                    ['role' => 'superadmin', 'roleTitle' => 'Super Administrator', 'division' => 'IT & System Development'],
-                    ['role' => 'management', 'roleTitle' => 'Direktur Operasional & Bisnis', 'division' => 'Executive Management'],
-                    ['role' => 'sales', 'roleTitle' => 'Sales Fiber Consultant', 'division' => 'Sales & Acquisition'],
-                    ['role' => 'noc', 'roleTitle' => 'Senior Network Engineer', 'division' => 'Network Operation Center'],
-                    ['role' => 'helpdesk', 'roleTitle' => 'Customer Care & Helpdesk', 'division' => 'Customer Service & Helpdesk'],
-                    ['role' => 'lead_tech', 'roleTitle' => 'Kepala Teknisi Lapangan', 'division' => 'Field Operations & Dispatch'],
-                    ['role' => 'field_tech', 'roleTitle' => 'Teknisi Instalasi & FO', 'division' => 'Field Operations'],
-                    ['role' => 'finance', 'roleTitle' => 'Finance & Billing Specialist', 'division' => 'Finance, Billing & Accounting'],
-                    ['role' => 'inventory', 'roleTitle' => 'Logistik & Asset Inventory', 'division' => 'Warehouse & Asset Logistics'],
-                ],
-                'editable_fields' => ['roleTitle', 'division'],
-            ],
             [
                 'key' => 'regions',
                 'label' => 'Regions & Clusters',
@@ -109,6 +116,65 @@ class IomsDemoSeeder extends Seeder
                 ['key' => $group['key']],
                 $group,
             );
+        }
+
+        $navigationHeads = [
+            ['key' => 'dashboards', 'label' => 'Dashboards', 'sort_order' => 1, 'is_active' => true],
+            ['key' => 'operasional', 'label' => 'Operasional', 'sort_order' => 2, 'is_active' => true],
+            ['key' => 'koordinasi', 'label' => 'Koordinasi', 'sort_order' => 3, 'is_active' => true],
+            ['key' => 'infrastruktur', 'label' => 'Infrastruktur', 'sort_order' => 4, 'is_active' => true],
+            ['key' => 'administrasi', 'label' => 'Administrasi Sistem', 'sort_order' => 5, 'is_active' => true],
+        ];
+
+        foreach ($navigationHeads as $head) {
+            NavigationHead::query()->updateOrCreate(['key' => $head['key']], $head);
+        }
+
+        $modules = [
+            ['module_key' => 'dashboard', 'label' => 'Dashboard', 'description' => 'Ringkasan utama workspace.', 'route_target' => '/app/dashboard', 'navigation_head_key' => 'dashboards', 'sort_order' => 1, 'quick_action' => null, 'view_formats' => ['grid', 'table'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'service_registrations', 'label' => 'Registrasi Pasang Baru', 'description' => 'Pipeline sales, finance, NOC, dan dispatch untuk pelanggan baru.', 'route_target' => '/app/service-registrations', 'navigation_head_key' => 'operasional', 'sort_order' => 1, 'quick_action' => 'new_customer', 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'helpdesk', 'label' => 'Helpdesk & Ticketing', 'description' => 'Aduan pelanggan, intake tiket, dan alur helpdesk.', 'route_target' => '/app/helpdesk', 'navigation_head_key' => 'operasional', 'sort_order' => 2, 'quick_action' => 'new_ticket', 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'noc', 'label' => 'NOC Console', 'description' => 'Triage teknis, verifikasi sinyal, dan closing tiket.', 'route_target' => '/app/noc', 'navigation_head_key' => 'operasional', 'sort_order' => 3, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'lead_tech', 'label' => 'Lead Technician Workspace', 'description' => 'Assign work order, review SOP, dan monitoring teknisi.', 'route_target' => '/app/lead-tech', 'navigation_head_key' => 'operasional', 'sort_order' => 4, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'field_tech', 'label' => 'Portal Teknisi Lapangan', 'description' => 'Eksekusi WO, bukti kerja, dan laporan on-site.', 'route_target' => '/app/field-tech', 'navigation_head_key' => 'operasional', 'sort_order' => 5, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'finance', 'label' => 'Finance Desk', 'description' => 'Billing pelanggan dan approval procurement finance.', 'route_target' => '/app/finance', 'navigation_head_key' => 'operasional', 'sort_order' => 6, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'inventory', 'label' => 'Warehouse Console', 'description' => 'Stok barang, serial aset, dan permintaan pengadaan.', 'route_target' => '/app/inventory', 'navigation_head_key' => 'operasional', 'sort_order' => 7, 'quick_action' => 'new_procurement', 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'kanban', 'label' => 'Kanban Koordinasi', 'description' => 'Koordinasi tugas antar divisi internal.', 'route_target' => '/app/kanban', 'navigation_head_key' => 'koordinasi', 'sort_order' => 1, 'quick_action' => 'new_task', 'view_formats' => ['kanban', 'table'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'network_map', 'label' => 'Peta Jaringan', 'description' => 'ODP, port binding, dan visualisasi mapping pelanggan.', 'route_target' => '/app/network-map', 'navigation_head_key' => 'infrastruktur', 'sort_order' => 1, 'quick_action' => null, 'view_formats' => ['map', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'admin_users', 'label' => 'Manajemen Akun', 'description' => 'CRUD akun login, status aktif, dan reset password.', 'route_target' => '/app/admin/users', 'navigation_head_key' => 'administrasi', 'sort_order' => 1, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => false, 'admin_only_dashboard' => true],
+            ['module_key' => 'admin_roles', 'label' => 'Master Data Role', 'description' => 'Metadata role system dan division aplikasi.', 'route_target' => '/app/admin/roles', 'navigation_head_key' => 'administrasi', 'sort_order' => 2, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => false, 'admin_only_dashboard' => true],
+            ['module_key' => 'admin_master', 'label' => 'Master Data', 'description' => 'Referensi paket, wilayah, inventory, dan workflow.', 'route_target' => '/app/admin/master', 'navigation_head_key' => 'administrasi', 'sort_order' => 3, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => false, 'admin_only_dashboard' => true],
+            ['module_key' => 'admin_modules', 'label' => 'Master Data Modul', 'description' => 'Daftar modul aplikasi, kepala navigasi, dan link akses internal.', 'route_target' => '/app/admin/modules', 'navigation_head_key' => 'administrasi', 'sort_order' => 4, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => false, 'admin_only_dashboard' => true],
+            ['module_key' => 'admin_module_roles', 'label' => 'Modul To Role', 'description' => 'Mapping modul terhadap role untuk membentuk navigasi aplikasi.', 'route_target' => '/app/admin/module-roles', 'navigation_head_key' => 'administrasi', 'sort_order' => 5, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => false, 'admin_only_dashboard' => true],
+            ['module_key' => 'admin_mappings', 'label' => 'Mapping Infrastruktur', 'description' => 'ODP, port binding, dan relasi entitas aplikasi.', 'route_target' => '/app/admin/mappings', 'navigation_head_key' => 'administrasi', 'sort_order' => 6, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => false, 'admin_only_dashboard' => true],
+            ['module_key' => 'admin_audit', 'label' => 'Audit & Session', 'description' => 'Jejak aktivitas dan sesi user online.', 'route_target' => '/app/admin/audit', 'navigation_head_key' => 'administrasi', 'sort_order' => 7, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => false, 'admin_only_dashboard' => true],
+        ];
+
+        foreach ($modules as $module) {
+            AppNavigationModule::query()->updateOrCreate(
+                ['module_key' => $module['module_key']],
+                $module,
+            );
+        }
+
+        $roleMappings = [
+            'management' => ['dashboard'],
+            'sales' => ['service_registrations', 'kanban'],
+            'helpdesk' => ['helpdesk', 'kanban'],
+            'noc' => ['service_registrations', 'noc', 'network_map', 'kanban'],
+            'lead_tech' => ['service_registrations', 'lead_tech', 'kanban'],
+            'field_tech' => ['field_tech'],
+            'finance' => ['service_registrations', 'finance', 'kanban'],
+            'inventory' => ['inventory', 'kanban'],
+        ];
+
+        foreach ($roleMappings as $role => $moduleKeys) {
+            foreach ($moduleKeys as $index => $moduleKey) {
+                RoleModuleMapping::query()->updateOrCreate(
+                    ['role' => $role, 'module_key' => $moduleKey],
+                    ['is_visible' => true, 'order_override' => $index + 1]
+                );
+            }
         }
 
         $odp = NetworkOdp::query()->updateOrCreate(

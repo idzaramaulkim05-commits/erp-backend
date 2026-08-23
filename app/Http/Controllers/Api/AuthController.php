@@ -9,6 +9,7 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\ResetPasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Models\AuditLog;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
@@ -36,6 +37,11 @@ class AuthController extends Controller
         }
 
         abort_if(! $user->is_active, 403, 'Akun Anda sedang dinonaktifkan. Hubungi superadmin.');
+        abort_if(
+            ! Role::query()->where('key', $user->role)->where('is_active', true)->exists(),
+            403,
+            'Role akun Anda sedang dinonaktifkan. Hubungi superadmin.'
+        );
 
         $token = $user->createToken('frontend')->plainTextToken;
         $user->update(['is_online' => true, 'last_login_at' => now()]);

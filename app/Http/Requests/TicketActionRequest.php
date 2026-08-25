@@ -15,6 +15,11 @@ class TicketActionRequest extends FormRequest
     {
         return [
             'notes' => ['required', 'string'],
+            'requires_replacement_request' => ['nullable', 'boolean'],
+            'replacement_items' => ['nullable', 'array'],
+            'replacement_items.*.item_name' => ['required_with:replacement_items', 'string'],
+            'replacement_items.*.quantity' => ['required_with:replacement_items', 'integer', 'min:1'],
+            'replacement_items.*.unit' => ['required_with:replacement_items', 'string'],
         ];
     }
 }

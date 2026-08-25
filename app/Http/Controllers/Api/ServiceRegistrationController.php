@@ -23,8 +23,14 @@ class ServiceRegistrationController extends Controller
 
     public function store(StoreServiceRegistrationRequest $request)
     {
+        $payload = $request->validated();
+
+        if ($request->hasFile('house_photo')) {
+            $payload['house_photo'] = $request->file('house_photo')->store('service-registrations/house-photos', 'public');
+        }
+
         return ServiceRegistrationResource::make(
-            $this->workflow->createServiceRegistration($request->validated(), $request->user())
+            $this->workflow->createServiceRegistration($payload, $request->user())
         );
     }
 
@@ -37,6 +43,39 @@ class ServiceRegistrationController extends Controller
     {
         return ServiceRegistrationResource::make(
             $this->workflow->submitServiceRegistration($serviceRegistration, $this->user())
+        );
+    }
+
+    public function validateRegistration(ServiceRegistration $serviceRegistration)
+    {
+        $payload = request()->validate([
+            'is_valid' => ['required', 'boolean'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        return ServiceRegistrationResource::make(
+            $this->workflow->validateServiceRegistration($serviceRegistration, $payload, $this->user())
+        );
+    }
+
+    public function survey(ServiceRegistration $serviceRegistration)
+    {
+        $payload = request()->validate([
+            'result' => ['required', 'string', 'in:layak,tidak_layak'],
+            'notes' => ['nullable', 'string'],
+            'odp_id' => ['nullable', 'string', 'exists:network_odps,id'],
+            'odp_port_candidate' => ['nullable', 'integer', 'min:1'],
+            'path_available' => ['nullable', 'boolean'],
+            'odp_available' => ['nullable', 'boolean'],
+            'recommended_team' => ['nullable', 'string', 'max:255'],
+            'required_materials' => ['required_if:result,layak', 'array', 'min:1'],
+            'required_materials.*.itemName' => ['required_with:required_materials', 'string', 'min:1'],
+            'required_materials.*.quantity' => ['required_with:required_materials', 'integer', 'min:1'],
+            'required_materials.*.unit' => ['required_with:required_materials', 'string', 'min:1'],
+        ]);
+
+        return ServiceRegistrationResource::make(
+            $this->workflow->surveyServiceRegistration($serviceRegistration, $payload, $this->user())
         );
     }
 

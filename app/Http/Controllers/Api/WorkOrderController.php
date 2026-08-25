@@ -39,8 +39,75 @@ class WorkOrderController extends Controller
         return $this->submitReport($request, $workOrder);
     }
 
+    public function startInstallation(WorkOrder $workOrder)
+    {
+        return WorkOrderResource::make($this->workflow->startInstallationWorkOrder($workOrder, request()->user()));
+    }
+
+    public function confirmFieldAssignment(WorkOrder $workOrder)
+    {
+        return WorkOrderResource::make($this->workflow->confirmFieldAssignment($workOrder, request()->user()));
+    }
+
+    public function returnToTech(WorkOrder $workOrder)
+    {
+        $payload = request()->validate([
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        return WorkOrderResource::make($this->workflow->returnInstallationToTech($workOrder, $payload, request()->user()));
+    }
+
     public function nocFinalVerify(InstallationNocVerifyRequest $request, WorkOrder $workOrder)
     {
         return WorkOrderResource::make($this->workflow->nocFinalVerifyInstallation($workOrder, $request->validated(), $request->user()));
+    }
+
+    public function requestPppoe(WorkOrder $workOrder)
+    {
+        $payload = request()->validate([
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        return WorkOrderResource::make($this->workflow->requestInstallationPppoe($workOrder, $payload, request()->user()));
+    }
+
+    public function approvePppoeRequest(WorkOrder $workOrder)
+    {
+        $payload = request()->validate([
+            'pppoe_username' => ['required', 'string'],
+            'pppoe_password' => ['required', 'string'],
+            'vlan' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        return WorkOrderResource::make($this->workflow->approveInstallationPppoeRequest($workOrder, $payload, request()->user()));
+    }
+
+    public function rejectPppoeRequest(WorkOrder $workOrder)
+    {
+        $payload = request()->validate([
+            'notes' => ['required', 'string'],
+        ]);
+
+        return WorkOrderResource::make($this->workflow->rejectInstallationPppoeRequest($workOrder, $payload, request()->user()));
+    }
+
+    public function confirmInstallationCash(WorkOrder $workOrder)
+    {
+        $payload = request()->validate([
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        return WorkOrderResource::make($this->workflow->confirmInstallationPayment($workOrder, 'tunai', $payload, request()->user()));
+    }
+
+    public function confirmInstallationTransfer(WorkOrder $workOrder)
+    {
+        $payload = request()->validate([
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        return WorkOrderResource::make($this->workflow->confirmInstallationPayment($workOrder, 'transfer', $payload, request()->user()));
     }
 }

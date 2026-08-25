@@ -8,6 +8,7 @@ use App\Http\Resources\NavigationHeadResource;
 use App\Models\AppNavigationModule;
 use App\Models\AuditLog;
 use App\Models\NavigationHead;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -124,6 +125,57 @@ class AdminModuleController extends Controller
         $this->logAdminEvent($request, 'Update Navigation Module', $module->module_key, 'Master modul navigasi diperbarui.');
 
         return AppNavigationModuleResource::make($module->fresh());
+    }
+
+    public function destroy(Request $request, string $moduleKey)
+    {
+        $module = AppNavigationModule::query()->findOrFail($moduleKey);
+
+        if ($this->isProtectedSystemModule($module->module_key)) {
+            return response()->json([
+                'message' => 'Modul sistem inti tidak boleh dihapus dari master modul.',
+            ], 422);
+        }
+
+        try {
+            $target = $module->module_key;
+            $module->delete();
+            $this->logAdminEvent($request, 'Delete Navigation Module', $target, 'Master modul navigasi dihapus dan mapping role terkait dibersihkan otomatis bila ada.');
+
+            return response()->json([
+                'message' => 'Modul berhasil dihapus.',
+            ]);
+        } catch (QueryException $exception) {
+            return response()->json([
+                'message' => 'Modul tidak bisa dihapus karena masih dipakai relasi data lain. Lepaskan dependensinya terlebih dahulu.',
+            ], 422);
+        }
+    }
+
+    private function isProtectedSystemModule(string $moduleKey): bool
+    {
+        return in_array($moduleKey, [
+            'dashboard',
+            'about',
+            'pelanggan',
+            'penagihan',
+            'service_registrations',
+            'helpdesk',
+            'noc',
+            'lead_tech',
+            'field_tech',
+            'finance',
+            'inventory',
+            'kanban',
+            'network_map',
+            'admin_users',
+            'admin_roles',
+            'admin_master',
+            'admin_modules',
+            'admin_module_roles',
+            'admin_mappings',
+            'admin_audit',
+        ], true);
     }
 
     private function logAdminEvent(Request $request, string $action, string $target, string $details): void

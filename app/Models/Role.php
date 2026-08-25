@@ -17,6 +17,7 @@ class Role extends Model
         'label',
         'division',
         'description',
+        'dashboard_module_key',
         'is_active',
         'sort_order',
     ];

@@ -45,6 +45,57 @@ class ProcurementWorkflowTest extends TestCase
             ->assertJsonPath('data.status', 'pending_management');
     }
 
+    public function test_rejected_procurement_can_be_revised_then_ordered_and_received(): void
+    {
+        $this->seed();
+
+        $this->loginAs('gudang.inventory@isp-ops.net');
+        $created = $this->postJson('/api/procurements', [
+            'item_code' => 'ONU-01',
+            'item_name' => 'ONU GPON 1 Port',
+            'quantity' => 25,
+            'unit' => 'Unit',
+            'unit_price' => 300000,
+            'reason' => 'Buffer stock awal.',
+        ])->assertCreated();
+
+        $procurementId = $created->json('data.id');
+
+        $this->loginAs('finance.billing@isp-ops.net');
+        $this->postJson('/api/procurements/'.$procurementId.'/finance-reject', [
+            'notes' => 'Mohon revisi qty agar sesuai kebutuhan bulan ini.',
+        ])->assertOk()
+            ->assertJsonPath('data.status', 'rejected')
+            ->assertJsonPath('data.rejectionNotes', 'Mohon revisi qty agar sesuai kebutuhan bulan ini.');
+
+        $this->loginAs('gudang.inventory@isp-ops.net');
+        $this->putJson('/api/procurements/'.$procurementId, [
+            'item_code' => 'ONU-01',
+            'item_name' => 'ONU GPON 1 Port',
+            'quantity' => 15,
+            'unit' => 'Unit',
+            'unit_price' => 300000,
+            'reason' => 'Revisi kebutuhan buffer stock bulan berjalan.',
+        ])->assertOk()
+            ->assertJsonPath('data.status', 'pending_finance');
+
+        $this->loginAs('finance.billing@isp-ops.net');
+        $this->postJson('/api/procurements/'.$procurementId.'/finance-approve', [
+            'notes' => 'Budget tersedia dan bisa diproses.',
+        ])->assertOk()
+            ->assertJsonPath('data.status', 'approved');
+
+        $this->loginAs('gudang.inventory@isp-ops.net');
+        $this->postJson('/api/procurements/'.$procurementId.'/mark-ordered', [
+            'notes' => 'PO internal dikirim ke vendor utama.',
+        ])->assertOk()
+            ->assertJsonPath('data.status', 'ordered');
+
+        $this->postJson('/api/procurements/'.$procurementId.'/receive')
+            ->assertOk()
+            ->assertJsonPath('data.status', 'received');
+    }
+
     private function loginAs(string $email): void
     {
         Sanctum::actingAs(User::query()->where('email', $email)->firstOrFail());

@@ -32,6 +32,8 @@ class CustomerResource extends JsonResource
             'status' => $this->status,
             'billingStatus' => $this->billing_status,
             'billingDueDate' => optional($this->billing_due_date)->format('Y-m-d'),
+            'serviceStartedAt' => optional($this->service_started_at)->format('Y-m-d'),
+            'serviceActiveUntil' => optional($this->service_active_until)->format('Y-m-d'),
             'ktpImage' => $this->ktp_image,
             'installedDate' => optional($this->installed_date)->format('Y-m-d'),
             'assignedTechnician' => optional($this->assignedTechnician)->name,

@@ -16,15 +16,16 @@ class NavigationConfigBuilder
             ->orderBy('sort_order')
             ->get();
 
-        $modules = AppNavigationModule::query()
+        $navbarModules = AppNavigationModule::query()
             ->where('is_active', true)
             ->where('show_in_navbar', true)
+            ->where('admin_only_dashboard', false)
             ->orderBy('sort_order')
             ->get();
 
         if ($role === 'superadmin') {
-            $allowedModuleKeys = $modules->pluck('module_key')->values()->all();
-            $resolvedModules = $modules;
+            $allowedModuleKeys = $navbarModules->pluck('module_key')->values()->all();
+            $resolvedModules = $navbarModules->values();
         } else {
             $mappingByModule = RoleModuleMapping::query()
                 ->where('role', $role)
@@ -33,7 +34,7 @@ class NavigationConfigBuilder
                 ->keyBy('module_key');
 
             $allowedModuleKeys = $mappingByModule->keys()->values()->all();
-            $resolvedModules = $modules
+            $resolvedModules = $navbarModules
                 ->filter(fn (AppNavigationModule $module) => $mappingByModule->has($module->module_key))
                 ->map(function (AppNavigationModule $module) use ($mappingByModule) {
                     $override = $mappingByModule->get($module->module_key)?->order_override;

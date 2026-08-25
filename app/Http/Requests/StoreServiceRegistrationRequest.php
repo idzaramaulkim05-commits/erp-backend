@@ -16,12 +16,17 @@ class StoreServiceRegistrationRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'nik' => ['required', 'string', 'max:32'],
+            'gender' => ['required', 'string', 'in:Laki-laki,Perempuan'],
             'phone' => ['required', 'string', 'max:32'],
             'address' => ['required', 'string'],
             'region' => ['required', 'string', 'max:255'],
             'package_plan' => ['required', 'string', 'max:255'],
             'monthly_fee' => ['required', 'integer', 'min:0'],
-            'odp_id' => ['required', 'string', 'exists:network_odps,id'],
+            'installation_fee' => ['required', 'integer', 'min:0'],
+            'odp_id' => ['nullable', 'string', 'exists:network_odps,id'],
+            'entry_source' => ['nullable', 'string', 'max:64'],
+            'share_location_url' => ['nullable', 'string', 'max:2048'],
+            'house_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
     }
 }

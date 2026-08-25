@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\HelpdeskCloseTicketRequest;
 use App\Http\Requests\LeadApprovalRequest;
 use App\Http\Requests\NocCloseRequest;
 use App\Http\Requests\StoreTicketRequest;
@@ -31,7 +32,15 @@ class TicketController extends Controller
 
     public function escalate(TicketActionRequest $request, TroubleTicket $ticket)
     {
-        return TicketResource::make($this->workflow->escalateTicket($ticket, $request->user(), $request->string('notes')->toString()));
+        return TicketResource::make($this->workflow->escalateTicket(
+            $ticket,
+            $request->user(),
+            $request->string('notes')->toString(),
+            [
+                'requires_replacement_request' => $request->boolean('requires_replacement_request'),
+                'replacement_items' => $request->validated('replacement_items') ?? [],
+            ],
+        ));
     }
 
     public function leadApprove(LeadApprovalRequest $request, TroubleTicket $ticket)
@@ -42,5 +51,10 @@ class TicketController extends Controller
     public function nocClose(NocCloseRequest $request, TroubleTicket $ticket)
     {
         return TicketResource::make($this->workflow->nocClose($ticket, $request->validated(), $request->user()));
+    }
+
+    public function helpdeskClose(HelpdeskCloseTicketRequest $request, TroubleTicket $ticket)
+    {
+        return TicketResource::make($this->workflow->helpdeskCloseTicket($ticket, $request->validated(), $request->user()));
     }
 }

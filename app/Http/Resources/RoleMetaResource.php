@@ -13,6 +13,7 @@ class RoleMetaResource extends JsonResource
             'role' => $this['role'],
             'roleTitle' => $this['roleTitle'],
             'division' => $this['division'],
+            'dashboardModuleKey' => $this['dashboardModuleKey'] ?? null,
             'description' => $this['description'] ?? null,
             'isActive' => (bool) ($this['isActive'] ?? true),
             'sortOrder' => (int) ($this['sortOrder'] ?? 0),

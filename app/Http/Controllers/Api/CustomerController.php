@@ -28,4 +28,16 @@ class CustomerController extends Controller
             $this->workflow->updateCustomerStatus($customer, $request->string('status')->toString(), $request->user(), $request->string('notes')->toString() ?: null)
         );
     }
+
+    public function recordPayment(Customer $customer)
+    {
+        $payload = request()->validate([
+            'notes' => ['nullable', 'string'],
+            'paid_at' => ['nullable', 'date'],
+        ]);
+
+        return CustomerResource::make(
+            $this->workflow->recordCustomerPayment($customer, request()->user(), $payload['notes'] ?? null, $payload['paid_at'] ?? null)
+        );
+    }
 }

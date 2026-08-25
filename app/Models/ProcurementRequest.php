@@ -24,6 +24,12 @@ class ProcurementRequest extends Model
         'status',
         'finance_approval',
         'management_approval',
+        'ordered_by',
+        'ordered_at',
+        'ordered_notes',
+        'rejection_notes',
+        'last_rejected_by',
+        'last_rejected_at',
         'received_at',
     ];
 
@@ -34,6 +40,8 @@ class ProcurementRequest extends Model
             'unit_price' => 'integer',
             'total_amount' => 'integer',
             'requested_at' => 'datetime',
+            'ordered_at' => 'datetime',
+            'last_rejected_at' => 'datetime',
             'received_at' => 'datetime',
             'finance_approval' => 'array',
             'management_approval' => 'array',

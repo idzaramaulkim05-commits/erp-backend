@@ -16,6 +16,7 @@ class AdminUserResource extends JsonResource
             'role' => $this->role,
             'roleTitle' => $this->role_title,
             'division' => $this->division,
+            'dashboardModuleKey' => $this->roleMeta?->dashboard_module_key,
             'avatar' => $this->avatar,
             'phone' => $this->phone,
             'isOnline' => (bool) $this->is_online,

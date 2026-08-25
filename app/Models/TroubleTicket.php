@@ -31,6 +31,7 @@ class TroubleTicket extends Model
         'field_work_report',
         'lead_tech_approval',
         'noc_final_verification',
+        'replacement_context',
     ];
 
     protected function casts(): array
@@ -40,6 +41,7 @@ class TroubleTicket extends Model
             'field_work_report' => 'array',
             'lead_tech_approval' => 'array',
             'noc_final_verification' => 'array',
+            'replacement_context' => 'array',
         ];
     }
 }

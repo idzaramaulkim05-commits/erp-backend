@@ -88,6 +88,7 @@ class AdminRoleModuleMappingController extends Controller
                 'role' => $role->key,
                 'roleTitle' => $role->label,
                 'division' => $role->division,
+                'dashboardModuleKey' => $role->dashboard_module_key,
                 'description' => $role->description,
                 'isActive' => (bool) $role->is_active,
                 'sortOrder' => (int) $role->sort_order,

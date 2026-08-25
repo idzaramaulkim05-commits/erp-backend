@@ -16,6 +16,22 @@ class AdminNavigationConfigController extends Controller
 {
     private const HEAD_KEY_PATTERN = '/^[a-z][a-z0-9_]*$/';
 
+    private function normalizeHeadKey(string $key): string
+    {
+        $normalized = Str::of($key)
+            ->trim()
+            ->ascii()
+            ->lower()
+            ->replaceMatches('/[^a-z0-9_]+/', '_')
+            ->replaceMatches('/_+/', '_')
+            ->trim('_')
+            ->value();
+
+        $normalized = preg_replace('/^[^a-z]+/', '', $normalized) ?? '';
+
+        return $normalized === 'oprasional' ? 'operasional' : $normalized;
+    }
+
     public function index()
     {
         return response()->json([
@@ -35,6 +51,23 @@ class AdminNavigationConfigController extends Controller
 
     public function update(Request $request)
     {
+        $heads = collect($request->input('heads', []))
+            ->map(function ($head) {
+                if (! is_array($head)) {
+                    return $head;
+                }
+
+                if (array_key_exists('key', $head) && is_string($head['key'])) {
+                    $head['key'] = $this->normalizeHeadKey($head['key']);
+                }
+
+                return $head;
+            })
+            ->values()
+            ->all();
+
+        $request->merge(['heads' => $heads]);
+
         $payload = $request->validate(
             [
                 'heads' => ['required', 'array', 'min:1'],

@@ -10,9 +10,26 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class AdminRoleMetaController extends Controller
 {
+    private const DASHBOARD_MODULE_KEYS = [
+        'dashboard',
+        'about',
+        'pelanggan',
+        'penagihan',
+        'service_registrations',
+        'helpdesk',
+        'noc',
+        'lead_tech',
+        'field_tech',
+        'finance',
+        'inventory',
+        'kanban',
+        'network_map',
+    ];
+
     public function index()
     {
         return RoleMetaResource::collection($this->buildRoleMetaCollection());
@@ -24,6 +41,7 @@ class AdminRoleMetaController extends Controller
             'role' => ['required', 'string', 'max:64', 'alpha_dash', 'unique:roles,key'],
             'role_title' => ['required', 'string', 'max:255'],
             'division' => ['required', 'string', 'max:255'],
+            'dashboard_module_key' => ['required', 'string', Rule::in(self::DASHBOARD_MODULE_KEYS)],
             'description' => ['nullable', 'string'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
@@ -33,6 +51,7 @@ class AdminRoleMetaController extends Controller
             'key' => $payload['role'],
             'label' => $payload['role_title'],
             'division' => $payload['division'],
+            'dashboard_module_key' => $payload['dashboard_module_key'],
             'description' => $payload['description'] ?? null,
             'sort_order' => $payload['sort_order'] ?? ((int) Role::query()->max('sort_order')) + 1,
             'is_active' => $payload['is_active'] ?? true,
@@ -48,6 +67,7 @@ class AdminRoleMetaController extends Controller
         $payload = $request->validate([
             'role_title' => ['required', 'string', 'max:255'],
             'division' => ['required', 'string', 'max:255'],
+            'dashboard_module_key' => ['required', 'string', Rule::in(self::DASHBOARD_MODULE_KEYS)],
             'description' => ['nullable', 'string'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
@@ -57,6 +77,7 @@ class AdminRoleMetaController extends Controller
         $roleModel->update([
             'label' => $payload['role_title'],
             'division' => $payload['division'],
+            'dashboard_module_key' => $payload['dashboard_module_key'],
             'description' => $payload['description'] ?? null,
             'sort_order' => $payload['sort_order'] ?? $roleModel->sort_order,
             ...($request->has('is_active') ? ['is_active' => $request->boolean('is_active')] : []),
@@ -127,6 +148,7 @@ class AdminRoleMetaController extends Controller
             'role' => $role->key,
             'roleTitle' => $role->label,
             'division' => $role->division,
+            'dashboardModuleKey' => $role->dashboard_module_key,
             'description' => $role->description,
             'isActive' => (bool) $role->is_active,
             'sortOrder' => (int) $role->sort_order,

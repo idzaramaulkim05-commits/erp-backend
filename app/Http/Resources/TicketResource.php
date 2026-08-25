@@ -31,6 +31,7 @@ class TicketResource extends JsonResource
             'fieldWorkReport' => $this->field_work_report,
             'leadTechApproval' => $this->lead_tech_approval,
             'nocFinalVerification' => $this->noc_final_verification,
+            'replacementContext' => $this->replacement_context ?? new \stdClass(),
         ];
     }
 }

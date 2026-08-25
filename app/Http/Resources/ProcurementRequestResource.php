@@ -23,6 +23,12 @@ class ProcurementRequestResource extends JsonResource
             'status' => $this->status,
             'financeApproval' => $this->finance_approval,
             'managementApproval' => $this->management_approval,
+            'orderedBy' => $this->ordered_by,
+            'orderedAt' => optional($this->ordered_at)->format('Y-m-d H:i:s'),
+            'orderedNotes' => $this->ordered_notes,
+            'rejectionNotes' => $this->rejection_notes,
+            'lastRejectedBy' => $this->last_rejected_by,
+            'lastRejectedAt' => optional($this->last_rejected_at)->format('Y-m-d H:i:s'),
             'receivedAt' => optional($this->received_at)->format('Y-m-d H:i:s'),
         ];
     }

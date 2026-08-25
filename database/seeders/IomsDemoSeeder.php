@@ -46,15 +46,15 @@ class IomsDemoSeeder extends Seeder
         }
 
         $roles = [
-            ['key' => 'superadmin', 'label' => 'Super Administrator', 'division' => 'IT & System Development', 'description' => 'Akses penuh ke dashboard admin sistem dan seluruh modul operasional.', 'sort_order' => 1],
-            ['key' => 'management', 'label' => 'Direktur Operasional & Bisnis', 'division' => 'Executive Management', 'description' => 'Dashboard analitik dan approval manajemen.', 'sort_order' => 2],
-            ['key' => 'sales', 'label' => 'Sales Fiber Consultant', 'division' => 'Sales & Acquisition', 'description' => 'Registrasi pelanggan baru dan handoff ke finance.', 'sort_order' => 3],
-            ['key' => 'noc', 'label' => 'Senior Network Engineer', 'division' => 'Network Operation Center', 'description' => 'Validasi teknis, PPPoE, dan final verify instalasi.', 'sort_order' => 4],
-            ['key' => 'helpdesk', 'label' => 'Customer Care & Helpdesk', 'division' => 'Customer Service & Helpdesk', 'description' => 'Intake aduan dan koordinasi tiket gangguan.', 'sort_order' => 5],
-            ['key' => 'lead_tech', 'label' => 'Kepala Teknisi Lapangan', 'division' => 'Field Operations & Dispatch', 'description' => 'Dispatch teknisi dan review SOP lapangan.', 'sort_order' => 6],
-            ['key' => 'field_tech', 'label' => 'Teknisi Instalasi & FO', 'division' => 'Field Operations', 'description' => 'Eksekusi work order on-site dan laporan teknisi.', 'sort_order' => 7],
-            ['key' => 'finance', 'label' => 'Finance & Billing Specialist', 'division' => 'Finance, Billing & Accounting', 'description' => 'Approval billing dan procurement finance.', 'sort_order' => 8],
-            ['key' => 'inventory', 'label' => 'Logistik & Asset Inventory', 'division' => 'Warehouse & Asset Logistics', 'description' => 'Gudang, stok, dan permintaan barang.', 'sort_order' => 9],
+            ['key' => 'superadmin', 'label' => 'Super Administrator', 'division' => 'IT & System Development', 'dashboard_module_key' => 'dashboard', 'description' => 'Akses penuh ke dashboard admin sistem dan seluruh modul operasional.', 'sort_order' => 1],
+            ['key' => 'management', 'label' => 'Direktur Operasional & Bisnis', 'division' => 'Executive Management', 'dashboard_module_key' => 'dashboard', 'description' => 'Dashboard analitik dan approval manajemen.', 'sort_order' => 2],
+            ['key' => 'sales', 'label' => 'Sales Fiber Consultant', 'division' => 'Sales & Acquisition', 'dashboard_module_key' => 'service_registrations', 'description' => 'Registrasi pelanggan baru dan handoff ke finance.', 'sort_order' => 3],
+            ['key' => 'noc', 'label' => 'Senior Network Engineer', 'division' => 'Network Operation Center', 'dashboard_module_key' => 'noc', 'description' => 'Validasi teknis, PPPoE, dan final verify instalasi.', 'sort_order' => 4],
+            ['key' => 'helpdesk', 'label' => 'Customer Care & Helpdesk', 'division' => 'Customer Service & Helpdesk', 'dashboard_module_key' => 'helpdesk', 'description' => 'Intake aduan dan koordinasi tiket gangguan.', 'sort_order' => 5],
+            ['key' => 'lead_tech', 'label' => 'Kepala Teknisi Lapangan', 'division' => 'Field Operations & Dispatch', 'dashboard_module_key' => 'service_registrations', 'description' => 'Dispatch teknisi dan review SOP lapangan.', 'sort_order' => 6],
+            ['key' => 'field_tech', 'label' => 'Teknisi Instalasi & FO', 'division' => 'Field Operations', 'dashboard_module_key' => 'field_tech', 'description' => 'Eksekusi work order on-site dan laporan teknisi.', 'sort_order' => 7],
+            ['key' => 'finance', 'label' => 'Finance & Billing Specialist', 'division' => 'Finance, Billing & Accounting', 'dashboard_module_key' => 'finance', 'description' => 'Approval billing dan procurement finance.', 'sort_order' => 8],
+            ['key' => 'inventory', 'label' => 'Logistik & Asset Inventory', 'division' => 'Warehouse & Asset Logistics', 'dashboard_module_key' => 'inventory', 'description' => 'Gudang, stok, dan permintaan barang.', 'sort_order' => 9],
         ];
 
         foreach ($roles as $role) {
@@ -124,6 +124,7 @@ class IomsDemoSeeder extends Seeder
             ['key' => 'koordinasi', 'label' => 'Koordinasi', 'sort_order' => 3, 'is_active' => true],
             ['key' => 'infrastruktur', 'label' => 'Infrastruktur', 'sort_order' => 4, 'is_active' => true],
             ['key' => 'administrasi', 'label' => 'Administrasi Sistem', 'sort_order' => 5, 'is_active' => true],
+            ['key' => 'keuangan', 'label' => 'Keuangan', 'sort_order' => 6, 'is_active' => true],
         ];
 
         foreach ($navigationHeads as $head) {
@@ -132,12 +133,17 @@ class IomsDemoSeeder extends Seeder
 
         $modules = [
             ['module_key' => 'dashboard', 'label' => 'Dashboard', 'description' => 'Ringkasan utama workspace.', 'route_target' => '/app/dashboard', 'navigation_head_key' => 'dashboards', 'sort_order' => 1, 'quick_action' => null, 'view_formats' => ['grid', 'table'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'pelanggan', 'label' => 'Pelanggan', 'description' => 'Daftar seluruh pelanggan aktif hasil registrasi dan aktivasi layanan.', 'route_target' => '/app/pelanggan', 'navigation_head_key' => 'operasional', 'sort_order' => 8, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'penagihan', 'label' => 'Penagihan', 'description' => 'Monitoring masa aktif 30 hari, status tagihan, dan aksi perpanjang paket pelanggan.', 'route_target' => '/app/penagihan', 'navigation_head_key' => 'operasional', 'sort_order' => 9, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'service_registrations', 'label' => 'Registrasi Pasang Baru', 'description' => 'Pipeline sales, finance, NOC, dan dispatch untuk pelanggan baru.', 'route_target' => '/app/service-registrations', 'navigation_head_key' => 'operasional', 'sort_order' => 1, 'quick_action' => 'new_customer', 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'helpdesk', 'label' => 'Helpdesk & Ticketing', 'description' => 'Aduan pelanggan, intake tiket, dan alur helpdesk.', 'route_target' => '/app/helpdesk', 'navigation_head_key' => 'operasional', 'sort_order' => 2, 'quick_action' => 'new_ticket', 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'noc', 'label' => 'NOC Console', 'description' => 'Triage teknis, verifikasi sinyal, dan closing tiket.', 'route_target' => '/app/noc', 'navigation_head_key' => 'operasional', 'sort_order' => 3, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'lead_tech', 'label' => 'Lead Technician Workspace', 'description' => 'Assign work order, review SOP, dan monitoring teknisi.', 'route_target' => '/app/lead-tech', 'navigation_head_key' => 'operasional', 'sort_order' => 4, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'field_tech', 'label' => 'Portal Teknisi Lapangan', 'description' => 'Eksekusi WO, bukti kerja, dan laporan on-site.', 'route_target' => '/app/field-tech', 'navigation_head_key' => 'operasional', 'sort_order' => 5, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'finance', 'label' => 'Finance Desk', 'description' => 'Billing pelanggan dan approval procurement finance.', 'route_target' => '/app/finance', 'navigation_head_key' => 'operasional', 'sort_order' => 6, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'request_rembes', 'label' => 'Request Rembes', 'description' => 'Pengajuan rembes pegawai.', 'route_target' => '/app/request-rembes', 'navigation_head_key' => 'keuangan', 'sort_order' => 1, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'approval_rembes_finance', 'label' => 'Approval Rembes Finance', 'description' => 'Review, approval, dan pencairan rembes.', 'route_target' => '/app/approval-rembes-finance', 'navigation_head_key' => 'keuangan', 'sort_order' => 2, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'laporan_keuangan', 'label' => 'Laporan Keuangan', 'description' => 'Ledger billing, rembes, dan mutasi.', 'route_target' => '/app/laporan-keuangan', 'navigation_head_key' => 'keuangan', 'sort_order' => 3, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'inventory', 'label' => 'Warehouse Console', 'description' => 'Stok barang, serial aset, dan permintaan pengadaan.', 'route_target' => '/app/inventory', 'navigation_head_key' => 'operasional', 'sort_order' => 7, 'quick_action' => 'new_procurement', 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'kanban', 'label' => 'Kanban Koordinasi', 'description' => 'Koordinasi tugas antar divisi internal.', 'route_target' => '/app/kanban', 'navigation_head_key' => 'koordinasi', 'sort_order' => 1, 'quick_action' => 'new_task', 'view_formats' => ['kanban', 'table'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'network_map', 'label' => 'Peta Jaringan', 'description' => 'ODP, port binding, dan visualisasi mapping pelanggan.', 'route_target' => '/app/network-map', 'navigation_head_key' => 'infrastruktur', 'sort_order' => 1, 'quick_action' => null, 'view_formats' => ['map', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
@@ -159,13 +165,14 @@ class IomsDemoSeeder extends Seeder
 
         $roleMappings = [
             'management' => ['dashboard'],
-            'sales' => ['service_registrations', 'kanban'],
-            'helpdesk' => ['helpdesk', 'kanban'],
-            'noc' => ['service_registrations', 'noc', 'network_map', 'kanban'],
-            'lead_tech' => ['service_registrations', 'lead_tech', 'kanban'],
-            'field_tech' => ['field_tech'],
-            'finance' => ['service_registrations', 'finance', 'kanban'],
-            'inventory' => ['inventory', 'kanban'],
+            'sales' => ['service_registrations', 'kanban', 'request_rembes'],
+            'helpdesk' => ['helpdesk', 'kanban', 'request_rembes'],
+            'noc' => ['service_registrations', 'noc', 'network_map', 'kanban', 'request_rembes'],
+            'lead_tech' => ['service_registrations', 'lead_tech', 'kanban', 'request_rembes'],
+            'field_tech' => ['field_tech', 'request_rembes'],
+            'finance' => ['service_registrations', 'finance', 'approval_rembes_finance', 'laporan_keuangan', 'request_rembes', 'kanban'],
+            'inventory' => ['inventory', 'kanban', 'request_rembes'],
+            'management' => ['dashboard', 'approval_rembes_finance', 'laporan_keuangan', 'request_rembes'],
         ];
 
         foreach ($roleMappings as $role => $moduleKeys) {

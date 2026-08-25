@@ -51,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('service-registrations', [ServiceRegistrationController::class, 'index']);
     Route::post('service-registrations', [ServiceRegistrationController::class, 'store'])->middleware('role:superadmin,sales,helpdesk,finance');
     Route::get('service-registrations/{serviceRegistration}', [ServiceRegistrationController::class, 'show']);
+    Route::match(['put', 'patch', 'post'], 'service-registrations/{serviceRegistration}/update', [ServiceRegistrationController::class, 'update'])->middleware('role:superadmin,sales,helpdesk,finance');
     Route::post('service-registrations/{serviceRegistration}/submit', [ServiceRegistrationController::class, 'submit'])->middleware('role:superadmin,sales,helpdesk,finance');
     Route::post('service-registrations/{serviceRegistration}/validate', [ServiceRegistrationController::class, 'validateRegistration'])->middleware('role:superadmin,helpdesk,finance,lead_tech');
     Route::post('service-registrations/{serviceRegistration}/survey', [ServiceRegistrationController::class, 'survey'])->middleware('role:superadmin,lead_tech');

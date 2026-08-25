@@ -34,6 +34,35 @@ class ServiceRegistrationController extends Controller
         );
     }
 
+    public function update(ServiceRegistration $serviceRegistration)
+    {
+        $payload = request()->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'nik' => ['sometimes', 'required', 'string', 'max:32'],
+            'gender' => ['sometimes', 'required', 'string', 'max:32'],
+            'phone' => ['sometimes', 'required', 'string', 'max:32'],
+            'address' => ['sometimes', 'required', 'string'],
+            'region' => ['sometimes', 'required', 'string', 'max:255'],
+            'package_plan' => ['sometimes', 'required', 'string', 'max:255'],
+            'monthly_fee' => ['sometimes', 'required', 'numeric', 'min:0'],
+            'installation_fee' => ['nullable', 'numeric', 'min:0'],
+            'odp_id' => ['nullable', 'string'],
+            'share_location_url' => ['nullable', 'string', 'max:500'],
+            'house_photo' => ['nullable'],
+            'resubmit' => ['nullable', 'boolean'],
+        ]);
+
+        if (request()->hasFile('house_photo')) {
+            $payload['house_photo'] = request()->file('house_photo')->store('service-registrations/house-photos', 'public');
+        }
+
+        $resubmit = request()->boolean('resubmit', false);
+
+        return ServiceRegistrationResource::make(
+            $this->workflow->updateServiceRegistration($serviceRegistration, $payload, $this->user(), $resubmit)
+        );
+    }
+
     public function show(ServiceRegistration $serviceRegistration)
     {
         return ServiceRegistrationResource::make($serviceRegistration->load(['requestedBy']));

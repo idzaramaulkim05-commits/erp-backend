@@ -57,6 +57,34 @@ class WorkflowService
         return $registration->fresh();
     }
 
+    public function updateServiceRegistration(ServiceRegistration $registration, array $payload, User $actor, bool $resubmit = false): ServiceRegistration
+    {
+        $data = [];
+        $allowedFields = [
+            'name', 'nik', 'gender', 'phone', 'address', 'region',
+            'package_plan', 'monthly_fee', 'installation_fee',
+            'odp_id', 'share_location_url', 'house_photo',
+        ];
+
+        foreach ($allowedFields as $field) {
+            if (array_key_exists($field, $payload)) {
+                $data[$field] = $payload[$field];
+            }
+        }
+
+        if ($resubmit) {
+            $data['status'] = 'menunggu_validasi';
+            $data['validation_status'] = 'pending';
+        }
+
+        $registration->update($data);
+
+        $action = $resubmit ? 'Service Registration Revised & Resubmitted' : 'Service Registration Updated';
+        $this->log($actor, $action, $registration->id, 'Data registrasi pelanggan diperbarui oleh ' . $actor->name, 'info');
+
+        return $registration->fresh();
+    }
+
     public function submitServiceRegistration(ServiceRegistration $registration, User $actor): ServiceRegistration
     {
         $registration->update([

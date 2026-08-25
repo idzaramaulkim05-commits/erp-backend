@@ -20,11 +20,13 @@ class ServiceRegistrationWorkflowTest extends TestCase
         $created = $this->postJson('/api/service-registrations', [
             'name' => 'Calon Pelanggan Sales',
             'nik' => '3515082405891001',
+            'gender' => 'Laki-laki',
             'phone' => '081298761234',
             'address' => 'Jl. Registrasi Baru No. 7',
             'region' => 'Sidoarjo Kota',
             'package_plan' => 'Home Fiber 50 Mbps',
             'monthly_fee' => 250000,
+            'installation_fee' => 150000,
             'odp_id' => 'ODP-SDA-01/01',
         ])->assertOk();
 
@@ -142,6 +144,89 @@ class ServiceRegistrationWorkflowTest extends TestCase
         $this->postJson('/api/service-registrations/SR-999/finance-approve', [
             'notes' => 'Tidak boleh lolos.',
         ])->assertForbidden();
+    }
+
+    public function test_helpdesk_can_create_and_submit_service_registration(): void
+    {
+        $this->seed();
+
+        $this->loginAs('helpdesk@isp-ops.net');
+        $created = $this->postJson('/api/service-registrations', [
+            'name' => 'Calon Pelanggan Helpdesk',
+            'nik' => '3515082405891099',
+            'gender' => 'Laki-laki',
+            'phone' => '081298769999',
+            'address' => 'Jl. Anggrek No. 10',
+            'region' => 'Sidoarjo Kota',
+            'package_plan' => 'Home 50 Mbps',
+            'monthly_fee' => 285000,
+            'installation_fee' => 150000,
+        ])->assertOk();
+
+        $registrationId = $created->json('data.id');
+
+        $this->postJson("/api/service-registrations/{$registrationId}/submit")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'menunggu_validasi');
+
+        $this->assertDatabaseHas('service_registrations', [
+            'id' => $registrationId,
+            'status' => 'menunggu_validasi',
+            'validation_status' => 'pending',
+        ]);
+    }
+
+    public function test_lead_tech_can_validate_and_survey_service_registration(): void
+    {
+        $this->seed();
+
+        $this->loginAs('helpdesk@isp-ops.net');
+        $created = $this->postJson('/api/service-registrations', [
+            'name' => 'Calon Pelanggan Validasi Lead Tech',
+            'nik' => '3515082405891088',
+            'gender' => 'Perempuan',
+            'phone' => '081298768888',
+            'address' => 'Jl. Melati No. 5',
+            'region' => 'Sidoarjo Kota',
+            'package_plan' => 'Home 50 Mbps',
+            'monthly_fee' => 285000,
+            'installation_fee' => 150000,
+        ])->assertOk();
+
+        $registrationId = $created->json('data.id');
+        $this->postJson("/api/service-registrations/{$registrationId}/submit")->assertOk();
+
+        // Lead tech validates
+        $this->loginAs('lead.tech@isp-ops.net');
+        $this->postJson("/api/service-registrations/{$registrationId}/validate", [
+            'is_valid' => true,
+            'notes' => 'Data KTP dan lokasi valid.',
+        ])->assertOk()
+            ->assertJsonPath('data.status', 'menunggu_survey')
+            ->assertJsonPath('data.validationStatus', 'approved');
+
+        // Lead tech surveys
+        $this->postJson("/api/service-registrations/{$registrationId}/survey", [
+            'result' => 'layak',
+            'notes' => 'Jalur FO aman, ODP tersedia.',
+            'odp_id' => 'ODP-SDA-01/01',
+            'odp_port_candidate' => 4,
+            'path_available' => true,
+            'odp_available' => true,
+            'recommended_team' => 'Tim Alpha',
+            'required_materials' => [
+                ['itemName' => 'Drop Cable 1 Core', 'quantity' => 150, 'unit' => 'Meter'],
+                ['itemName' => 'ONT ZTE F609', 'quantity' => 1, 'unit' => 'Unit'],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.surveyResult', 'layak')
+            ->assertJsonPath('data.surveyStatus', 'completed');
+
+        // Lead tech navigation includes validasi_registrasi and survey_instalasi
+        $nav = $this->getJson('/api/auth/navigation')->assertOk();
+        $allowedKeys = $nav->json('data.allowedModuleKeys');
+        $this->assertContains('validasi_registrasi', $allowedKeys);
+        $this->assertContains('survey_instalasi', $allowedKeys);
     }
 
     private function loginAs(string $email): void

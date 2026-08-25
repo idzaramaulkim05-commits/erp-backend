@@ -51,8 +51,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('service-registrations', [ServiceRegistrationController::class, 'index']);
     Route::post('service-registrations', [ServiceRegistrationController::class, 'store'])->middleware('role:superadmin,sales,helpdesk,finance');
     Route::get('service-registrations/{serviceRegistration}', [ServiceRegistrationController::class, 'show']);
-    Route::post('service-registrations/{serviceRegistration}/submit', [ServiceRegistrationController::class, 'submit'])->middleware('role:superadmin,sales');
-    Route::post('service-registrations/{serviceRegistration}/validate', [ServiceRegistrationController::class, 'validateRegistration'])->middleware('role:superadmin,helpdesk,finance');
+    Route::post('service-registrations/{serviceRegistration}/submit', [ServiceRegistrationController::class, 'submit'])->middleware('role:superadmin,sales,helpdesk,finance');
+    Route::post('service-registrations/{serviceRegistration}/validate', [ServiceRegistrationController::class, 'validateRegistration'])->middleware('role:superadmin,helpdesk,finance,lead_tech');
     Route::post('service-registrations/{serviceRegistration}/survey', [ServiceRegistrationController::class, 'survey'])->middleware('role:superadmin,lead_tech');
     Route::post('service-registrations/{serviceRegistration}/finance-approve', [ServiceRegistrationController::class, 'financeApprove'])->middleware('role:superadmin,finance');
     Route::post('service-registrations/{serviceRegistration}/finance-reject', [ServiceRegistrationController::class, 'financeReject'])->middleware('role:superadmin,finance');
@@ -126,7 +126,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index']);
     Route::get('users', [UserController::class, 'index']);
     Route::get('audit-logs', [AuditLogController::class, 'index']);
-    Route::get('admin/master-data', [AdminMasterDataController::class, 'index'])->middleware('role:superadmin,helpdesk,finance');
+    Route::get('admin/master-data', [AdminMasterDataController::class, 'index']);
 
     Route::prefix('admin')->middleware('role:superadmin')->group(function () {
         Route::get('overview', [AdminOverviewController::class, 'index']);

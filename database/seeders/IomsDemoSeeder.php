@@ -147,6 +147,10 @@ class IomsDemoSeeder extends Seeder
             ['module_key' => 'inventory', 'label' => 'Warehouse Console', 'description' => 'Stok barang, serial aset, dan permintaan pengadaan.', 'route_target' => '/app/inventory', 'navigation_head_key' => 'operasional', 'sort_order' => 7, 'quick_action' => 'new_procurement', 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'kanban', 'label' => 'Kanban Koordinasi', 'description' => 'Koordinasi tugas antar divisi internal.', 'route_target' => '/app/kanban', 'navigation_head_key' => 'koordinasi', 'sort_order' => 1, 'quick_action' => 'new_task', 'view_formats' => ['kanban', 'table'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'network_map', 'label' => 'Peta Jaringan', 'description' => 'ODP, port binding, dan visualisasi mapping pelanggan.', 'route_target' => '/app/network-map', 'navigation_head_key' => 'infrastruktur', 'sort_order' => 1, 'quick_action' => null, 'view_formats' => ['map', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'registrasi_pelanggan_baru', 'label' => 'Registrasi Pelanggan Baru', 'description' => 'Intake internal pelanggan baru, paket, lokasi, dan data awal instalasi.', 'route_target' => '/app/registrasi-pelanggan-baru', 'navigation_head_key' => 'operasional', 'sort_order' => 14, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'validasi_registrasi', 'label' => 'Validasi Registrasi', 'description' => 'Antrean verifikasi kelengkapan data registrasi pelanggan sebelum survey.', 'route_target' => '/app/validasi-registrasi', 'navigation_head_key' => 'operasional', 'sort_order' => 15, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'survey_instalasi', 'label' => 'Survey Instalasi', 'description' => 'Kelayakan instalasi, ODP, jalur, dan kebutuhan teknis survey.', 'route_target' => '/app/survey-instalasi', 'navigation_head_key' => 'operasional', 'sort_order' => 16, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
+            ['module_key' => 'panel_kepala_teknisi', 'label' => 'Panel Kepala Teknisi', 'description' => 'Panel ringkasan distribusi WO, tim teknisi, dan monitoring instalasi.', 'route_target' => '/app/panel-kepala-teknisi', 'navigation_head_key' => 'operasional', 'sort_order' => 17, 'quick_action' => null, 'view_formats' => ['table', 'grid'], 'is_active' => true, 'show_in_navbar' => true, 'admin_only_dashboard' => false],
             ['module_key' => 'admin_users', 'label' => 'Manajemen Akun', 'description' => 'CRUD akun login, status aktif, dan reset password.', 'route_target' => '/app/admin/users', 'navigation_head_key' => 'administrasi', 'sort_order' => 1, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => false, 'admin_only_dashboard' => true],
             ['module_key' => 'admin_roles', 'label' => 'Master Data Role', 'description' => 'Metadata role system dan division aplikasi.', 'route_target' => '/app/admin/roles', 'navigation_head_key' => 'administrasi', 'sort_order' => 2, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => false, 'admin_only_dashboard' => true],
             ['module_key' => 'admin_master', 'label' => 'Master Data', 'description' => 'Referensi paket, wilayah, inventory, dan workflow.', 'route_target' => '/app/admin/master', 'navigation_head_key' => 'administrasi', 'sort_order' => 3, 'quick_action' => null, 'view_formats' => ['table'], 'is_active' => true, 'show_in_navbar' => false, 'admin_only_dashboard' => true],
@@ -164,15 +168,14 @@ class IomsDemoSeeder extends Seeder
         }
 
         $roleMappings = [
-            'management' => ['dashboard'],
-            'sales' => ['service_registrations', 'kanban', 'request_rembes'],
-            'helpdesk' => ['helpdesk', 'kanban', 'request_rembes'],
+            'management' => ['dashboard', 'approval_rembes_finance', 'laporan_keuangan', 'request_rembes'],
+            'sales' => ['registrasi_pelanggan_baru', 'service_registrations', 'kanban', 'request_rembes'],
+            'helpdesk' => ['helpdesk', 'registrasi_pelanggan_baru', 'validasi_registrasi', 'kanban', 'request_rembes'],
             'noc' => ['service_registrations', 'noc', 'network_map', 'kanban', 'request_rembes'],
-            'lead_tech' => ['service_registrations', 'lead_tech', 'kanban', 'request_rembes'],
+            'lead_tech' => ['panel_kepala_teknisi', 'lead_tech', 'validasi_registrasi', 'survey_instalasi', 'service_registrations', 'kanban', 'request_rembes'],
             'field_tech' => ['field_tech', 'request_rembes'],
             'finance' => ['service_registrations', 'finance', 'approval_rembes_finance', 'laporan_keuangan', 'request_rembes', 'kanban'],
             'inventory' => ['inventory', 'kanban', 'request_rembes'],
-            'management' => ['dashboard', 'approval_rembes_finance', 'laporan_keuangan', 'request_rembes'],
         ];
 
         foreach ($roleMappings as $role => $moduleKeys) {

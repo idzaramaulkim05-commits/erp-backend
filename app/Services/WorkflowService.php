@@ -126,21 +126,16 @@ class WorkflowService
         return DB::transaction(function () use ($registration, $payload, $actor) {
             $requiredMaterials = collect($payload['required_materials'] ?? [])
                 ->map(fn (array $item) => [
-                    'itemName' => trim((string) ($item['itemName'] ?? '')),
-                    'quantity' => (int) ($item['quantity'] ?? 0),
-                    'unit' => trim((string) ($item['unit'] ?? '')),
+                    'itemName' => trim((string) ($item['itemName'] ?? $item['item_name'] ?? '')),
+                    'quantity' => max(1, (int) ($item['quantity'] ?? 1)),
+                    'unit' => trim((string) ($item['unit'] ?? 'Unit')),
                 ])
                 ->filter(fn (array $item) => $item['itemName'] !== '' && $item['quantity'] > 0 && $item['unit'] !== '')
                 ->values()
                 ->all();
 
-            if ($payload['result'] === 'layak') {
-                abort_if(empty($requiredMaterials), 422, 'Material wajib diisi untuk survey layak instalasi.');
-                abort_if(
-                    count($requiredMaterials) !== count($payload['required_materials'] ?? []),
-                    422,
-                    'Lengkapi semua baris material terlebih dahulu.'
-                );
+            if ($payload['result'] === 'layak' && empty($requiredMaterials)) {
+                $requiredMaterials = $this->defaultInstallationMaterials();
             }
 
             $surveyData = [

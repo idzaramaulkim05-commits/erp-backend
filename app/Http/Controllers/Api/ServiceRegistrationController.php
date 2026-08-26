@@ -92,15 +92,12 @@ class ServiceRegistrationController extends Controller
         $payload = request()->validate([
             'result' => ['required', 'string', 'in:layak,tidak_layak'],
             'notes' => ['nullable', 'string'],
-            'odp_id' => ['nullable', 'string', 'exists:network_odps,id'],
+            'odp_id' => ['nullable', 'string'],
             'odp_port_candidate' => ['nullable', 'integer', 'min:1'],
             'path_available' => ['nullable', 'boolean'],
             'odp_available' => ['nullable', 'boolean'],
             'recommended_team' => ['nullable', 'string', 'max:255'],
-            'required_materials' => ['required_if:result,layak', 'array', 'min:1'],
-            'required_materials.*.itemName' => ['required_with:required_materials', 'string', 'min:1'],
-            'required_materials.*.quantity' => ['required_with:required_materials', 'integer', 'min:1'],
-            'required_materials.*.unit' => ['required_with:required_materials', 'string', 'min:1'],
+            'required_materials' => ['nullable', 'array'],
         ]);
 
         return ServiceRegistrationResource::make(

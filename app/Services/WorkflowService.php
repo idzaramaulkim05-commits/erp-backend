@@ -29,7 +29,7 @@ class WorkflowService
     public function createServiceRegistration(array $payload, User $actor): ServiceRegistration
     {
         $registration = ServiceRegistration::query()->create([
-            'id' => $this->nextCode('SR', ServiceRegistration::query()->count() + 1),
+            'id' => $this->generateUniqueId(ServiceRegistration::class, 'SR', 1),
             'name' => $payload['name'],
             'nik' => $payload['nik'],
             'gender' => $payload['gender'],
@@ -43,8 +43,8 @@ class WorkflowService
             'entry_source' => $payload['entry_source'] ?? 'internal',
             'share_location_url' => $payload['share_location_url'] ?? null,
             'house_photo' => $payload['house_photo'] ?? null,
-            'status' => 'draft',
-            'validation_status' => 'draft',
+            'status' => 'menunggu_validasi',
+            'validation_status' => 'pending',
             'survey_status' => 'pending',
             'finance_status' => 'pending',
             'noc_status' => 'pending',
@@ -52,7 +52,7 @@ class WorkflowService
             'meta' => ['created_by' => $actor->id],
         ]);
 
-        $this->log($actor, 'Service Registration Drafted', $registration->id, 'Draft registrasi pelanggan baru dibuat.', 'info');
+        $this->log($actor, 'Service Registration Submitted', $registration->id, 'Registrasi pelanggan baru dibuat dan diteruskan ke validasi.', 'info');
 
         return $registration->fresh();
     }
@@ -293,88 +293,21 @@ class WorkflowService
                 $registration = $this->generateServiceRegistrationPppoe($registration, $actor);
             }
 
-            $odp = null;
-            $port = null;
-            $customer = null;
-
-            if ($registration->odp_id) {
-                $odp = NetworkOdp::query()->with('ports')->findOrFail($registration->odp_id);
-                $port = $odp->ports()
-                    ->where('status', 'empty')
-                    ->when($registration->odp_port_candidate, fn ($query) => $query->where('port_number', $registration->odp_port_candidate))
-                    ->orderBy('port_number')
-                    ->first();
-            }
-
-            if ($odp && $port) {
-                $serviceStartedAt = Carbon::now()->toDateString();
-                $serviceActiveUntil = Carbon::now()->addDays(30)->toDateString();
-                $customerId = $this->nextCode('CUST', Customer::query()->count() + 1042);
-                $customer = Customer::query()->create([
-                    'id' => $customerId,
-                    'name' => $registration->name,
-                    'nik' => $registration->nik,
-                    'phone' => $registration->phone,
-                    'address' => $registration->address,
-                    'region' => $registration->region,
-                    'package_plan' => $registration->package_plan,
-                    'monthly_fee' => $registration->monthly_fee,
-                    'pppoe_username' => $registration->pppoe_username,
-                    'pppoe_password' => $registration->pppoe_password,
-                    'ip_address' => '10.20.'.random_int(10, 40).'.'.random_int(10, 200),
-                    'ont_brand' => 'ZTE',
-                    'ont_model' => 'ZTE F609 V3',
-                    'ont_serial_number' => 'ONT'.random_int(100000, 999999),
-                    'odc_id' => $odp->odc_id,
-                    'odp_id' => $odp->id,
-                    'odp_port' => $port->port_number,
-                    'fiber_core_color' => $odp->fiber_core_color,
-                    'optical_power_dbm' => -21.0,
-                    'status' => 'active',
-                    'billing_status' => 'pending',
-                    'billing_due_date' => $serviceActiveUntil,
-                    'service_started_at' => $serviceStartedAt,
-                    'service_active_until' => $serviceActiveUntil,
-                    'installed_date' => Carbon::now()->toDateString(),
-                    'assigned_technician_id' => User::query()->where('role', 'field_tech')->value('id'),
-                    'meta' => ['created_by_registration' => $registration->id],
-                ]);
-
-                $port->update([
-                    'customer_id' => $customer->id,
-                    'customer_name' => $customer->name,
-                    'pppoe_username' => $customer->pppoe_username,
-                    'optical_power_dbm' => $customer->optical_power_dbm,
-                    'status' => 'active',
-                ]);
-
-                $odp->update([
-                    'used_ports' => $odp->ports()->whereIn('status', ['active', 'faulty'])->count(),
-                ]);
-
-                BillingRecord::query()->create([
-                    'customer_id' => $customer->id,
-                    'status' => $customer->billing_status,
-                    'amount' => $customer->monthly_fee,
-                    'due_date' => Carbon::parse($customer->service_active_until ?? $customer->billing_due_date)->toDateString(),
-                    'paid_at' => null,
-                    'notes' => 'Service registration conversion',
-                ]);
-            }
-
             $surveyData = $registration->survey_data ?? [];
-            $requiredMaterials = $surveyData['requiredMaterials'] ?? [];
+            $requiredMaterials = $surveyData['requiredMaterials'] ?? $this->defaultInstallationMaterials();
 
             abort_if(
                 empty($requiredMaterials),
                 422,
-                'Kebutuhan material instalasi belum diisi. Lengkapi material dari tahap NOC sebelum membuat WO instalasi.'
+                'Kebutuhan material instalasi belum diisi. Lengkapi material survey sebelum membuat WO instalasi.'
             );
 
+            $workOrderId = $this->generateUniqueId(WorkOrder::class, 'WO', 400);
+
             $workOrder = WorkOrder::query()->create([
-                'id' => $this->nextCode('WO', WorkOrder::query()->count() + 400),
+                'id' => $workOrderId,
                 'type' => 'installation',
-                'customer_id' => $customer?->id,
+                'customer_id' => $registration->customer_id ?? null,
                 'customer_name' => $registration->name,
                 'customer_phone' => $registration->phone,
                 'address' => $registration->address,
@@ -413,7 +346,6 @@ class WorkflowService
 
             $registration->update([
                 'status' => 'siap_wo_instalasi',
-                'customer_id' => $customer?->id,
                 'work_order_id' => $workOrder->id,
                 'installation_material_request_id' => $materialRequest->id,
             ]);
@@ -492,7 +424,7 @@ class WorkflowService
             ]);
 
             WorkOrder::query()->create([
-                'id' => $this->nextCode('WO', WorkOrder::query()->count() + 400),
+                'id' => $this->generateUniqueId(WorkOrder::class, 'WO', 400),
                 'type' => 'installation',
                 'customer_id' => $customer->id,
                 'customer_name' => $customer->name,
@@ -570,7 +502,7 @@ class WorkflowService
             ]);
 
             FinanceMutation::query()->create([
-                'id' => $this->nextCode('FM', FinanceMutation::query()->count() + 1),
+                'id' => $this->generateUniqueId(FinanceMutation::class, 'FM', 1),
                 'transaction_date' => $paymentDate->toDateString(),
                 'type' => 'inflow',
                 'category' => 'Pembayaran Tagihan Bulanan',
@@ -600,7 +532,7 @@ class WorkflowService
             abort_if(empty($normalizedItems), 422, 'Tambahkan minimal satu item rembes.');
 
             $reimbursement = ReimbursementRequest::query()->create([
-                'id' => $this->nextCode('RMB', ReimbursementRequest::query()->count() + 1),
+                'id' => $this->generateUniqueId(ReimbursementRequest::class, 'RMB', 1),
                 'requested_by_id' => $actor->id,
                 'requester_role' => $actor->role,
                 'requester_division' => $actor->division,
@@ -779,7 +711,7 @@ class WorkflowService
         $physical = in_array($category, ['los_red_light', 'relocation', 'uninstallation'], true);
 
         $ticket = TroubleTicket::query()->create([
-            'id' => $this->nextCode('TKT', TroubleTicket::query()->count() + 880),
+            'id' => $this->generateUniqueId(TroubleTicket::class, 'TKT', 880),
             'customer_id' => $customer->id,
             'customer_name' => $customer->name,
             'customer_phone' => $customer->phone,
@@ -848,7 +780,7 @@ class WorkflowService
             $workOrder = WorkOrder::query()->updateOrCreate(
                 ['ticket_id' => $ticket->id],
                 [
-                    'id' => WorkOrder::query()->where('ticket_id', $ticket->id)->value('id') ?: $this->nextCode('WO', WorkOrder::query()->count() + 600),
+                    'id' => WorkOrder::query()->where('ticket_id', $ticket->id)->value('id') ?: $this->generateUniqueId(WorkOrder::class, 'WO', 600),
                     'type' => 'maintenance',
                     'customer_id' => $ticket->customer_id,
                     'customer_name' => $ticket->customer_name,
@@ -1505,7 +1437,7 @@ class WorkflowService
             $techName = $workOrder->assigned_tech_name ?? 'Teknisi Lapangan';
 
             FinanceMutation::query()->create([
-                'id' => $this->nextCode('FM', FinanceMutation::query()->count() + 1),
+                'id' => $this->generateUniqueId(FinanceMutation::class, 'FM', 1),
                 'transaction_date' => Carbon::today()->toDateString(),
                 'type' => 'inflow',
                 'category' => $category,
@@ -1658,7 +1590,7 @@ class WorkflowService
         $total = (int) $payload['quantity'] * (int) $payload['unit_price'];
 
         $request = ProcurementRequest::query()->create([
-            'id' => $this->nextCode('REQ', ProcurementRequest::query()->count() + 30),
+            'id' => $this->generateUniqueId(ProcurementRequest::class, 'REQ', 1),
             'item_code' => $payload['item_code'],
             'item_name' => $payload['item_name'],
             'quantity' => $payload['quantity'],
@@ -1840,7 +1772,7 @@ class WorkflowService
     public function createTask(array $payload, User $actor): InterDivisionTask
     {
         $task = InterDivisionTask::query()->create([
-            'id' => $this->nextCode('TASK', InterDivisionTask::query()->count() + 90),
+            'id' => $this->generateUniqueId(InterDivisionTask::class, 'TASK', 90),
             'title' => $payload['title'],
             'description' => $payload['description'],
             'from_division' => $payload['from_division'],
@@ -1889,6 +1821,27 @@ class WorkflowService
         ]);
     }
 
+    public function generateUniqueId(string $modelClass, string $prefix, int $startOffset = 1): string
+    {
+        $maxNum = $startOffset - 1;
+        $allIds = $modelClass::query()->pluck('id')->all();
+        foreach ($allIds as $id) {
+            if (preg_match('/^' . preg_quote($prefix, '/') . '-(\d+)$/i', (string) $id, $matches)) {
+                $num = (int) $matches[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        $nextNum = $maxNum + 1;
+        while ($modelClass::query()->where('id', $prefix . '-' . $nextNum)->exists()) {
+            $nextNum++;
+        }
+
+        return $prefix . '-' . $nextNum;
+    }
+
     private function nextCode(string $prefix, int $number): string
     {
         return $prefix.'-'.$number;
@@ -1901,7 +1854,7 @@ class WorkflowService
         array $items
     ): InstallationMaterialRequest {
         return InstallationMaterialRequest::query()->create([
-            'id' => $this->nextCode('IMR', InstallationMaterialRequest::query()->count() + 1),
+            'id' => $this->generateUniqueId(InstallationMaterialRequest::class, 'IMR', 1),
             'service_registration_id' => $registration->id,
             'work_order_id' => $workOrder->id,
             'ticket_id' => null,
@@ -1924,7 +1877,7 @@ class WorkflowService
             ['work_order_id' => $workOrder->id],
             [
                 'id' => InstallationMaterialRequest::query()->where('work_order_id', $workOrder->id)->value('id')
-                    ?: $this->nextCode('IMR', InstallationMaterialRequest::query()->count() + 1),
+                    ?: $this->generateUniqueId(InstallationMaterialRequest::class, 'IMR', 1),
                 'service_registration_id' => null,
                 'work_order_id' => $workOrder->id,
                 'ticket_id' => $ticket->id,
@@ -1999,7 +1952,7 @@ class WorkflowService
             ['work_order_id' => $workOrder->id],
             [
                 'id' => WarehouseReturnRequest::query()->where('work_order_id', $workOrder->id)->value('id')
-                    ?: $this->nextCode('RTR', WarehouseReturnRequest::query()->count() + 1),
+                    ?: $this->generateUniqueId(WarehouseReturnRequest::class, 'RTR', 1),
                 'ticket_id' => $workOrder->ticket_id,
                 'customer_id' => $workOrder->customer_id,
                 'customer_name' => $workOrder->customer_name,
@@ -2059,7 +2012,7 @@ class WorkflowService
             ->first();
 
         $ticket = $existingTicket ?: TroubleTicket::query()->create([
-            'id' => $this->nextCode('TKT', TroubleTicket::query()->count() + 880),
+            'id' => $this->generateUniqueId(TroubleTicket::class, 'TKT', 880),
             'customer_id' => $customer->id,
             'customer_name' => $customer->name,
             'customer_phone' => $customer->phone,
@@ -2089,7 +2042,7 @@ class WorkflowService
 
         if (! $existingWorkOrder) {
             WorkOrder::query()->create([
-                'id' => $this->nextCode('WO', WorkOrder::query()->count() + 500),
+                'id' => $this->generateUniqueId(WorkOrder::class, 'WO', 500),
                 'type' => 'uninstallation',
                 'customer_id' => $customer->id,
                 'customer_name' => $customer->name,

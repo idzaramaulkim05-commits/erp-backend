@@ -44,6 +44,9 @@ Route::prefix('auth')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('customers', [CustomerController::class, 'index']);
+    Route::post('customers/import/preview', [CustomerController::class, 'previewImport'])->middleware('role:superadmin');
+    Route::post('customers/import/confirm', [CustomerController::class, 'confirmImport'])->middleware('role:superadmin');
+    Route::get('customers/import/template', [CustomerController::class, 'downloadTemplate'])->middleware('role:superadmin');
     Route::post('customers', [CustomerController::class, 'store'])->middleware('role:superadmin,helpdesk,inventory');
     Route::patch('customers/{customer}/status', [CustomerController::class, 'updateStatus'])->middleware('role:superadmin,finance');
     Route::post('customers/{customer}/record-payment', [CustomerController::class, 'recordPayment'])->middleware('role:superadmin,finance');

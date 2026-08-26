@@ -2169,4 +2169,319 @@ class WorkflowService
             ->values()
             ->all();
     }
+
+    public function previewCustomerImport(array $rows, ?UploadedFile $file, User $actor): array
+    {
+        if ($file) {
+            $rows = $this->parseCustomerImportFile($file);
+        }
+
+        $existingPhones = Customer::query()->pluck('phone', 'id')->toArray();
+        $existingNiks = Customer::query()->whereNotNull('nik')->where('nik', '!=', '')->pluck('nik', 'id')->toArray();
+        $existingOdps = NetworkOdp::query()->with('ports')->get()->keyBy('id');
+
+        $seenPhonesInFile = [];
+        $seenNiksInFile = [];
+
+        $evaluatedRows = [];
+        $validCount = 0;
+        $errorCount = 0;
+        $warningCount = 0;
+
+        foreach ($rows as $index => $raw) {
+            $rowNum = $index + 1;
+            $name = trim((string) ($raw['name'] ?? $raw['nama'] ?? $raw['nama_pelanggan'] ?? ''));
+            $nik = trim((string) ($raw['nik'] ?? $raw['no_ktp'] ?? $raw['ktp'] ?? ''));
+            $phone = trim((string) ($raw['phone'] ?? $raw['telepon'] ?? $raw['no_hp'] ?? $raw['no_telepon'] ?? $raw['whatsapp'] ?? ''));
+            $address = trim((string) ($raw['address'] ?? $raw['alamat'] ?? ''));
+            $region = trim((string) ($raw['region'] ?? $raw['wilayah'] ?? 'Denpasar'));
+            $packagePlan = trim((string) ($raw['package_plan'] ?? $raw['paket'] ?? $raw['paket_layanan'] ?? 'Home 30 Mbps'));
+            $monthlyFee = (int) preg_replace('/[^\d]/', '', (string) ($raw['monthly_fee'] ?? $raw['tarif'] ?? $raw['tarif_bulanan'] ?? $raw['biaya'] ?? '250000'));
+            $odpId = trim((string) ($raw['odp_id'] ?? $raw['odp'] ?? ''));
+            $pppoeUser = trim((string) ($raw['pppoe_username'] ?? $raw['username'] ?? ''));
+            $pppoePass = trim((string) ($raw['pppoe_password'] ?? $raw['password'] ?? ''));
+            $paymentStatus = strtolower(trim((string) ($raw['status_pembayaran'] ?? $raw['payment_status'] ?? $raw['billing_status'] ?? 'paid')));
+            $isPaid = in_array($paymentStatus, ['paid', 'lunas', '1', 'true', 'sudah bayar'], true);
+
+            $errors = [];
+            $warnings = [];
+
+            if (empty($name)) {
+                $errors[] = 'Nama pelanggan wajib diisi.';
+            } elseif (strlen($name) < 2) {
+                $errors[] = 'Nama pelanggan terlalu pendek (minimal 2 karakter).';
+            }
+
+            $cleanPhone = preg_replace('/[^\d]/', '', $phone);
+            if (empty($phone) || strlen($cleanPhone) < 8) {
+                $errors[] = 'Nomor HP wajib diisi dan minimal 8 digit angka.';
+            } else {
+                if (isset($seenPhonesInFile[$cleanPhone])) {
+                    $errors[] = sprintf('Duplikasi nomor HP dalam file (sama dengan baris %d).', $seenPhonesInFile[$cleanPhone]);
+                } else {
+                    $seenPhonesInFile[$cleanPhone] = $rowNum;
+                }
+
+                $existingPhoneMatch = array_search($phone, $existingPhones, true) ?: array_search($cleanPhone, $existingPhones, true);
+                if ($existingPhoneMatch) {
+                    $warnings[] = sprintf('Nomor HP sudah terdaftar di database pada pelanggan ID %s.', $existingPhoneMatch);
+                }
+            }
+
+            if (empty($address)) {
+                $errors[] = 'Alamat pelanggan wajib diisi.';
+            }
+
+            if (!empty($nik)) {
+                $cleanNik = preg_replace('/[^\d]/', '', $nik);
+                if (strlen($cleanNik) !== 16) {
+                    $warnings[] = 'Format NIK sebaiknya 16 digit angka.';
+                }
+
+                if (isset($seenNiksInFile[$cleanNik])) {
+                    $warnings[] = sprintf('Duplikasi NIK dalam file (sama dengan baris %d).', $seenNiksInFile[$cleanNik]);
+                } else {
+                    $seenNiksInFile[$cleanNik] = $rowNum;
+                }
+
+                $existingNikMatch = array_search($nik, $existingNiks, true) ?: array_search($cleanNik, $existingNiks, true);
+                if ($existingNikMatch) {
+                    $warnings[] = sprintf('NIK sudah terdaftar di database pada pelanggan ID %s.', $existingNikMatch);
+                }
+            }
+
+            if (!empty($odpId)) {
+                if (!isset($existingOdps[$odpId])) {
+                    $warnings[] = sprintf('ODP "%s" tidak ditemukan dalam master data jaringan.', $odpId);
+                } else {
+                    $odpObj = $existingOdps[$odpId];
+                    $emptyPorts = $odpObj->ports->where('status', 'empty')->count();
+                    if ($emptyPorts === 0) {
+                        $warnings[] = sprintf('ODP "%s" tidak memiliki port kosong yang tersedia.', $odpId);
+                    }
+                }
+            }
+
+            if ($monthlyFee <= 0) {
+                $monthlyFee = 250000;
+                $warnings[] = 'Tarif bulanan belum diisi/0, diatur default Rp 250.000.';
+            }
+
+            $rowStatus = count($errors) > 0 ? 'error' : (count($warnings) > 0 ? 'warning' : 'valid');
+            if ($rowStatus === 'error') {
+                $errorCount++;
+            } elseif ($rowStatus === 'warning') {
+                $warningCount++;
+                $validCount++;
+            } else {
+                $validCount++;
+            }
+
+            $evaluatedRows[] = [
+                'row_number' => $rowNum,
+                'status' => $rowStatus,
+                'data' => [
+                    'name' => $name,
+                    'nik' => $nik,
+                    'phone' => $phone,
+                    'address' => $address,
+                    'region' => $region ?: 'Denpasar',
+                    'package_plan' => $packagePlan ?: 'Home 30 Mbps',
+                    'monthly_fee' => $monthlyFee,
+                    'odp_id' => $odpId,
+                    'pppoe_username' => $pppoeUser,
+                    'pppoe_password' => $pppoePass,
+                    'initial_deposit_paid' => $isPaid,
+                ],
+                'errors' => $errors,
+                'warnings' => $warnings,
+            ];
+        }
+
+        return [
+            'total_rows' => count($rows),
+            'valid_count' => $validCount,
+            'error_count' => $errorCount,
+            'warning_count' => $warningCount,
+            'can_import_all' => $errorCount === 0 && $validCount > 0,
+            'can_import_valid' => $validCount > 0,
+            'rows' => $evaluatedRows,
+        ];
+    }
+
+    public function executeCustomerImport(array $rows, User $actor): array
+    {
+        abort_unless($actor->hasAnyRole(['superadmin']), 403, 'Hanya superadmin yang berhak mengimpor data pelanggan.');
+
+        return DB::transaction(function () use ($rows, $actor) {
+            $createdCustomers = [];
+            $startIndex = Customer::query()->count() + 1042;
+            $odpMap = NetworkOdp::query()->with('ports')->get()->keyBy('id');
+
+            foreach ($rows as $item) {
+                $raw = is_array($item) ? ($item['data'] ?? $item) : [];
+                $name = trim((string) ($raw['name'] ?? ''));
+                $phone = trim((string) ($raw['phone'] ?? ''));
+
+                if (empty($name) || empty($phone)) {
+                    continue;
+                }
+
+                $startIndex++;
+                $customerId = $this->nextCode('CUST', $startIndex);
+                while (Customer::query()->where('id', $customerId)->exists()) {
+                    $startIndex++;
+                    $customerId = $this->nextCode('CUST', $startIndex);
+                }
+
+                $pppoeUsername = !empty($raw['pppoe_username'])
+                    ? $raw['pppoe_username']
+                    : strtolower(str_replace('-', '', $customerId)).'@isp.net';
+                $pppoePassword = !empty($raw['pppoe_password'])
+                    ? $raw['pppoe_password']
+                    : Str::random(8).'!@';
+
+                $serviceStartedAt = Carbon::now()->toDateString();
+                $serviceActiveUntil = Carbon::now()->addDays(30)->toDateString();
+                $isPaid = !empty($raw['initial_deposit_paid']);
+
+                $odpId = !empty($raw['odp_id']) && isset($odpMap[$raw['odp_id']]) ? $raw['odp_id'] : null;
+                $odcId = null;
+                $odpPort = null;
+                $fiberColor = null;
+
+                if ($odpId) {
+                    $odp = $odpMap[$odpId];
+                    $odcId = $odp->odc_id;
+                    $fiberColor = $odp->fiber_core_color;
+                    $port = $odp->ports()->where('status', 'empty')->orderBy('port_number')->first();
+                    if ($port) {
+                        $odpPort = $port->port_number;
+                        $port->update([
+                            'customer_id' => $customerId,
+                            'customer_name' => $name,
+                            'pppoe_username' => $pppoeUsername,
+                            'optical_power_dbm' => -21.0,
+                            'status' => 'active',
+                        ]);
+                        $odp->update([
+                            'used_ports' => $odp->ports()->whereIn('status', ['active', 'faulty'])->count(),
+                        ]);
+                    }
+                }
+
+                $customer = Customer::query()->create([
+                    'id' => $customerId,
+                    'name' => $name,
+                    'nik' => $raw['nik'] ?? null,
+                    'phone' => $phone,
+                    'address' => $raw['address'] ?? '-',
+                    'region' => $raw['region'] ?? 'Denpasar',
+                    'package_plan' => $raw['package_plan'] ?? 'Home 30 Mbps',
+                    'monthly_fee' => (int) ($raw['monthly_fee'] ?? 250000),
+                    'pppoe_username' => $pppoeUsername,
+                    'pppoe_password' => $pppoePassword,
+                    'ip_address' => '10.20.'.random_int(10, 40).'.'.random_int(10, 200),
+                    'ont_brand' => 'ZTE',
+                    'ont_model' => 'ZTE F609 V3',
+                    'ont_serial_number' => 'ONT'.random_int(100000, 999999),
+                    'odc_id' => $odcId,
+                    'odp_id' => $odpId,
+                    'odp_port' => $odpPort,
+                    'fiber_core_color' => $fiberColor,
+                    'optical_power_dbm' => -21.0,
+                    'status' => 'active',
+                    'billing_status' => $isPaid ? 'paid' : 'pending',
+                    'billing_due_date' => $serviceActiveUntil,
+                    'service_started_at' => $serviceStartedAt,
+                    'service_active_until' => $serviceActiveUntil,
+                    'installed_date' => $serviceStartedAt,
+                    'assigned_technician_id' => User::query()->where('role', 'field_tech')->value('id'),
+                    'last_payment_date' => $isPaid ? $serviceStartedAt : null,
+                    'meta' => [
+                        'imported_at' => Carbon::now()->toIso8601String(),
+                        'imported_by' => $actor->id,
+                        'import_source' => 'excel',
+                    ],
+                ]);
+
+                BillingRecord::query()->create([
+                    'customer_id' => $customer->id,
+                    'status' => $customer->billing_status,
+                    'amount' => $customer->monthly_fee,
+                    'due_date' => $serviceActiveUntil,
+                    'paid_at' => $customer->last_payment_date,
+                    'notes' => 'Import via Excel oleh '.$actor->name,
+                ]);
+
+                $createdCustomers[] = [
+                    'id' => $customer->id,
+                    'name' => $customer->name,
+                    'phone' => $customer->phone,
+                    'package_plan' => $customer->package_plan,
+                    'region' => $customer->region,
+                ];
+            }
+
+            $this->log($actor, 'Import Customers Excel', 'BULK_IMPORT', sprintf('%d pelanggan baru berhasil diimpor ke sistem.', count($createdCustomers)), 'success');
+
+            return [
+                'success' => true,
+                'imported_count' => count($createdCustomers),
+                'customers' => $createdCustomers,
+            ];
+        });
+    }
+
+    private function parseCustomerImportFile(UploadedFile $file): array
+    {
+        $content = file_get_contents($file->getRealPath());
+        if ($content === false) {
+            return [];
+        }
+
+        $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+        $lines = preg_split('/\r\n|\r|\n/', trim($content));
+        if (empty($lines)) {
+            return [];
+        }
+
+        $headerLine = $lines[0];
+        $delimiters = [',', ';', "\t", '|'];
+        $bestDelimiter = ',';
+        $maxCount = 0;
+        foreach ($delimiters as $delim) {
+            $count = substr_count($headerLine, $delim);
+            if ($count > $maxCount) {
+                $maxCount = $count;
+                $bestDelimiter = $delim;
+            }
+        }
+
+        $parsedRows = [];
+        $headers = [];
+
+        foreach ($lines as $i => $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+            $cols = str_getcsv($line, $bestDelimiter);
+            if ($i === 0) {
+                $headers = array_map(fn ($h) => strtolower(trim(preg_replace('/[^a-zA-Z0-9_]/', '_', (string) $h))), $cols);
+                continue;
+            }
+
+            if (empty($cols) || count(array_filter($cols, fn ($c) => trim((string) $c) !== '')) === 0) {
+                continue;
+            }
+
+            $rowObj = [];
+            foreach ($headers as $hIdx => $hKey) {
+                $rowObj[$hKey] = $cols[$hIdx] ?? '';
+            }
+            $parsedRows[] = $rowObj;
+        }
+
+        return $parsedRows;
+    }
 }

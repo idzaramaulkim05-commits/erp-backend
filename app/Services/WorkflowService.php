@@ -537,9 +537,9 @@ class WorkflowService
         });
     }
 
-    public function recordCustomerPayment(Customer $customer, User $actor, ?string $notes = null, ?string $paidAt = null): Customer
+    public function recordCustomerPayment(Customer $customer, User $actor, ?string $notes = null, ?string $paidAt = null, ?string $paymentChannel = null): Customer
     {
-        return DB::transaction(function () use ($customer, $actor, $notes, $paidAt) {
+        return DB::transaction(function () use ($customer, $actor, $notes, $paidAt, $paymentChannel) {
             $paymentDate = $paidAt ? Carbon::parse($paidAt)->startOfDay() : Carbon::today();
             $currentActiveUntil = $customer->service_active_until
                 ? Carbon::parse($customer->service_active_until)->startOfDay()
@@ -566,14 +566,26 @@ class WorkflowService
                 'amount' => $customer->monthly_fee,
                 'due_date' => $nextActiveUntil->toDateString(),
                 'paid_at' => $paymentDate->toDateString(),
-                'notes' => $notes ?: 'Perpanjangan masa aktif 30 hari.',
+                'notes' => trim(($paymentChannel ? "[{$paymentChannel}] " : '').($notes ?: 'Perpanjangan masa aktif 30 hari.')),
+            ]);
+
+            FinanceMutation::query()->create([
+                'id' => $this->nextCode('FM', FinanceMutation::query()->count() + 1),
+                'transaction_date' => $paymentDate->toDateString(),
+                'type' => 'inflow',
+                'category' => 'Pembayaran Tagihan Bulanan',
+                'amount' => (int) $customer->monthly_fee,
+                'description' => sprintf('Pembayaran langganan %s (%s) via %s. %s', $customer->name, $customer->id, $paymentChannel ?: 'Kas/Bank Kantor', $notes ?: ''),
+                'reference' => $customer->id,
+                'status' => 'confirmed',
+                'created_by_id' => $actor->id,
             ]);
 
             $this->log(
                 $actor,
                 'Recorded Customer Payment',
                 $customer->id,
-                trim(($notes ?: 'Pembayaran pelanggan dicatat.').' Masa aktif sampai '.$nextActiveUntil->toDateString().'.'),
+                trim(($notes ?: 'Pembayaran pelanggan dicatat.').' via '.($paymentChannel ?: 'Kas/Bank Kantor').'. Masa aktif sampai '.$nextActiveUntil->toDateString().'.'),
                 'success'
             );
 
@@ -1488,7 +1500,9 @@ class WorkflowService
             abort_unless($workOrder->installation_payment_status === 'pending_finance', 422, 'Pembayaran pemasangan ini tidak sedang menunggu konfirmasi finance.');
             abort_unless((bool) $workOrder->installation_payment_customer_paid, 422, 'Pembayaran pelanggan belum ditandai lunas di lapangan.');
 
-            $category = $method === 'tunai' ? 'Biaya Pemasangan Tunai' : 'Biaya Pemasangan Transfer';
+            $channel = $payload['payment_channel'] ?? ($method === 'tunai' ? 'Tunai / Cash Kantor' : 'Transfer Bank Kantor');
+            $category = $method === 'tunai' ? 'Biaya Pemasangan Baru (Tunai)' : 'Biaya Pemasangan Baru (Transfer)';
+            $techName = $workOrder->assigned_tech_name ?? 'Teknisi Lapangan';
 
             FinanceMutation::query()->create([
                 'id' => $this->nextCode('FM', FinanceMutation::query()->count() + 1),
@@ -1496,7 +1510,7 @@ class WorkflowService
                 'type' => 'inflow',
                 'category' => $category,
                 'amount' => (int) ($workOrder->installation_fee_actual ?? 0),
-                'description' => sprintf('Konfirmasi biaya pemasangan %s untuk %s.', $method, $workOrder->customer_name),
+                'description' => sprintf('Biaya pasang baru %s (%s) via %s. Disetor oleh: %s. %s', $workOrder->customer_name, $workOrder->id, $channel, $techName, $payload['notes'] ?? ''),
                 'reference' => $workOrder->id,
                 'status' => 'confirmed',
                 'created_by_id' => $actor->id,
@@ -1506,10 +1520,10 @@ class WorkflowService
                 'installation_payment_status' => 'confirmed_finance',
                 'installation_payment_confirmed_at' => Carbon::now(),
                 'installation_payment_confirmed_by' => $actor->name,
-                'installation_payment_notes' => $payload['notes'] ?? null,
+                'installation_payment_notes' => trim(($payload['notes'] ?? '')." [Channel: {$channel}]"),
             ]);
 
-            $this->log($actor, 'Confirmed Installation Payment', $workOrder->id, $payload['notes'] ?? $category, 'success');
+            $this->log($actor, 'Confirmed Installation Payment', $workOrder->id, sprintf('Biaya pasang %s disetujui via %s.', $workOrder->id, $channel), 'success');
 
             return $workOrder->fresh();
         });

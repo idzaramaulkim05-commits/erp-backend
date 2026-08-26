@@ -14,8 +14,11 @@ class FinancialLedgerController extends Controller
 {
     public function index(): JsonResponse
     {
+        $mutationReferences = FinanceMutation::query()->pluck('reference')->filter()->all();
+
         $billingEntries = BillingRecord::query()
             ->where('status', 'paid')
+            ->whereNotIn('customer_id', $mutationReferences)
             ->with('customer')
             ->get()
             ->map(fn (BillingRecord $record) => [
@@ -23,9 +26,9 @@ class FinancialLedgerController extends Controller
                 'transactionDate' => optional($record->paid_at ?? $record->due_date)->format('Y-m-d'),
                 'source' => 'billing',
                 'type' => 'inflow',
-                'category' => 'Billing',
+                'category' => 'Billing Pelanggan',
                 'amount' => (int) $record->amount,
-                'description' => 'Pembayaran pelanggan '.optional($record->customer)->name,
+                'description' => $record->notes ?: 'Pembayaran pelanggan '.optional($record->customer)->name,
                 'reference' => $record->customer_id,
                 'status' => $record->status,
                 'actorName' => optional($record->customer)->name,

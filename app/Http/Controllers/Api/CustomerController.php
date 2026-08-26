@@ -34,10 +34,17 @@ class CustomerController extends Controller
         $payload = request()->validate([
             'notes' => ['nullable', 'string'],
             'paid_at' => ['nullable', 'date'],
+            'payment_channel' => ['nullable', 'string'],
         ]);
 
         return CustomerResource::make(
-            $this->workflow->recordCustomerPayment($customer, request()->user(), $payload['notes'] ?? null, $payload['paid_at'] ?? null)
+            $this->workflow->recordCustomerPayment(
+                $customer,
+                request()->user(),
+                $payload['notes'] ?? null,
+                $payload['paid_at'] ?? null,
+                $payload['payment_channel'] ?? null
+            )
         );
     }
 }

@@ -97,6 +97,7 @@ class WorkOrderController extends Controller
     {
         $payload = request()->validate([
             'notes' => ['nullable', 'string'],
+            'payment_channel' => ['nullable', 'string'],
         ]);
 
         return WorkOrderResource::make($this->workflow->confirmInstallationPayment($workOrder, 'tunai', $payload, request()->user()));
@@ -106,6 +107,7 @@ class WorkOrderController extends Controller
     {
         $payload = request()->validate([
             'notes' => ['nullable', 'string'],
+            'payment_channel' => ['nullable', 'string'],
         ]);
 
         return WorkOrderResource::make($this->workflow->confirmInstallationPayment($workOrder, 'transfer', $payload, request()->user()));

@@ -857,6 +857,18 @@ class WorkflowService
     public function submitFieldReport(WorkOrder $workOrder, array $report, User $actor): WorkOrder
     {
         return DB::transaction(function () use ($workOrder, $report, $actor) {
+            $photoKtpPath = $report['photo_ktp'] instanceof UploadedFile
+                ? $report['photo_ktp']->store('work-orders/photos', 'public')
+                : ($report['photo_ktp'] ?? null);
+            $photoOdpPath = $report['photo_odp'] instanceof UploadedFile
+                ? $report['photo_odp']->store('work-orders/photos', 'public')
+                : ($report['photo_odp'] ?? null);
+            $photoOpmPath = $report['photo_optical_power_meter'] instanceof UploadedFile
+                ? $report['photo_optical_power_meter']->store('work-orders/photos', 'public')
+                : ($report['photo_optical_power_meter'] ?? null);
+            $photoModemPath = $report['photo_modem_identity'] instanceof UploadedFile
+                ? $report['photo_modem_identity']->store('work-orders/photos', 'public')
+                : ($report['photo_modem_identity'] ?? null);
             $installationPhotoPath = $report['photo_installation_result'] instanceof UploadedFile
                 ? $report['photo_installation_result']->store('work-orders/installation-photos', 'public')
                 : ($report['photo_installation_result'] ?? null);
@@ -879,14 +891,9 @@ class WorkflowService
                     'Checklist konfirmasi biodata pelanggan wajib dicentang sebelum submit ke QC NOC.'
                 );
                 abort_if(
-                    trim((string) ($report['router_sn'] ?? '')) === '',
+                    trim((string) ($report['router_sn'] ?? $report['mac_address'] ?? '')) === '',
                     422,
-                    'SN router / ONU wajib diisi untuk pasang baru.'
-                );
-                abort_if(
-                    ! is_string($installationPhotoPath) || trim($installationPhotoPath) === '',
-                    422,
-                    'Foto pemasangan wajib dilengkapi untuk pasang baru.'
+                    'SN / MAC address router wajib diisi untuk pasang baru.'
                 );
                 abort_if(
                     ! in_array($report['installation_payment_method'] ?? null, ['tunai', 'transfer'], true),
@@ -962,16 +969,16 @@ class WorkflowService
                     ? (bool) ($report['customer_biodata_confirmed'] ?? false)
                     : $workOrder->customer_biodata_confirmed,
                 'router_sn' => $isNewInstallation
-                    ? trim((string) ($report['router_sn'] ?? ''))
+                    ? trim((string) ($report['router_sn'] ?? $report['mac_address'] ?? ''))
                     : $workOrder->router_sn,
                 'used_materials' => $usedMaterials,
                 'photos' => [
-                    'ktp' => $report['photo_ktp'] ?? null,
-                    'odp' => $report['photo_odp'] ?? null,
-                    'opmReading' => $report['photo_optical_power_meter'] ?? null,
+                    'ktp' => $photoKtpPath,
+                    'odp' => $photoOdpPath,
+                    'opmReading' => $photoOpmPath,
                     'installedDevice' => $report['photo_modem_installation'] ?? null,
-                    'modemIdentity' => $report['photo_modem_identity'] ?? null,
-                    'installationResult' => $installationPhotoPath,
+                    'modemIdentity' => $photoModemPath,
+                    'installationResult' => $installationPhotoPath ?? $photoModemPath,
                 ],
                 'activation_payload' => [
                     'actionTaken' => $report['action_taken'],

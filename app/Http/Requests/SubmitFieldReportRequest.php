@@ -25,26 +25,12 @@ class SubmitFieldReportRequest extends FormRequest
             'patch_cord_replaced' => ['nullable', 'boolean'],
             'drop_cable_length_meters' => ['nullable', 'integer'],
             'modem_replaced' => ['nullable', 'boolean'],
-            'new_ont_serial_number' => ['nullable', 'string'],
-            'photo_ktp' => ['nullable', 'string'],
-            'photo_odp' => ['nullable', 'string'],
-            'photo_optical_power_meter' => ['nullable', 'string'],
-            'photo_modem_installation' => ['nullable', 'string'],
-            'photo_modem_identity' => ['nullable', 'string'],
-            'photo_installation_result' => [
-                'nullable',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if ($value instanceof UploadedFile) {
-                        if (! str_starts_with($value->getMimeType() ?: '', 'image/')) {
-                            $fail('Foto pemasangan harus berupa file gambar.');
-                        }
-
-                        if ($value->getSize() > 5 * 1024 * 1024) {
-                            $fail('Ukuran foto pemasangan maksimal 5 MB.');
-                        }
-                    }
-                },
-            ],
+            'photo_ktp' => ['nullable'],
+            'photo_odp' => ['nullable'],
+            'photo_optical_power_meter' => ['nullable'],
+            'photo_modem_installation' => ['nullable'],
+            'photo_modem_identity' => ['nullable'],
+            'photo_installation_result' => ['nullable'],
             'pon_sn' => ['nullable', 'string'],
             'onu_serial_number' => ['nullable', 'string'],
             'mac_address' => ['nullable', 'string'],

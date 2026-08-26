@@ -857,21 +857,61 @@ class WorkflowService
     public function submitFieldReport(WorkOrder $workOrder, array $report, User $actor): WorkOrder
     {
         return DB::transaction(function () use ($workOrder, $report, $actor) {
-            $photoKtpPath = $report['photo_ktp'] instanceof UploadedFile
-                ? $report['photo_ktp']->store('work-orders/photos', 'public')
-                : ($report['photo_ktp'] ?? null);
-            $photoOdpPath = $report['photo_odp'] instanceof UploadedFile
-                ? $report['photo_odp']->store('work-orders/photos', 'public')
-                : ($report['photo_odp'] ?? null);
-            $photoOpmPath = $report['photo_optical_power_meter'] instanceof UploadedFile
-                ? $report['photo_optical_power_meter']->store('work-orders/photos', 'public')
-                : ($report['photo_optical_power_meter'] ?? null);
-            $photoModemPath = $report['photo_modem_identity'] instanceof UploadedFile
-                ? $report['photo_modem_identity']->store('work-orders/photos', 'public')
-                : ($report['photo_modem_identity'] ?? null);
-            $installationPhotoPath = $report['photo_installation_result'] instanceof UploadedFile
-                ? $report['photo_installation_result']->store('work-orders/installation-photos', 'public')
-                : ($report['photo_installation_result'] ?? null);
+            $photoKtpPath = null;
+            if ($report['photo_ktp'] instanceof UploadedFile) {
+                try {
+                    $photoKtpPath = $report['photo_ktp']->store('work-orders/photos', 'public');
+                } catch (\Throwable) {
+                    $photoKtpPath = $report['photo_ktp']->getClientOriginalName();
+                }
+            } else {
+                $photoKtpPath = $report['photo_ktp'] ?? null;
+            }
+
+            $photoOdpPath = null;
+            if ($report['photo_odp'] instanceof UploadedFile) {
+                try {
+                    $photoOdpPath = $report['photo_odp']->store('work-orders/photos', 'public');
+                } catch (\Throwable) {
+                    $photoOdpPath = $report['photo_odp']->getClientOriginalName();
+                }
+            } else {
+                $photoOdpPath = $report['photo_odp'] ?? null;
+            }
+
+            $photoOpmPath = null;
+            if ($report['photo_optical_power_meter'] instanceof UploadedFile) {
+                try {
+                    $photoOpmPath = $report['photo_optical_power_meter']->store('work-orders/photos', 'public');
+                } catch (\Throwable) {
+                    $photoOpmPath = $report['photo_optical_power_meter']->getClientOriginalName();
+                }
+            } else {
+                $photoOpmPath = $report['photo_optical_power_meter'] ?? null;
+            }
+
+            $photoModemPath = null;
+            if ($report['photo_modem_identity'] instanceof UploadedFile) {
+                try {
+                    $photoModemPath = $report['photo_modem_identity']->store('work-orders/photos', 'public');
+                } catch (\Throwable) {
+                    $photoModemPath = $report['photo_modem_identity']->getClientOriginalName();
+                }
+            } else {
+                $photoModemPath = $report['photo_modem_identity'] ?? null;
+            }
+
+            $installationPhotoPath = null;
+            if ($report['photo_installation_result'] instanceof UploadedFile) {
+                try {
+                    $installationPhotoPath = $report['photo_installation_result']->store('work-orders/installation-photos', 'public');
+                } catch (\Throwable) {
+                    $installationPhotoPath = $report['photo_installation_result']->getClientOriginalName();
+                }
+            } else {
+                $installationPhotoPath = $report['photo_installation_result'] ?? null;
+            }
+
             $usedMaterials = $report['used_materials'] ?? [];
             $returnItems = $this->normalizeWarehouseItems($report['return_items'] ?? []);
             $isInstallation = (bool) $workOrder->service_registration_id;
@@ -922,18 +962,26 @@ class WorkflowService
             $uninstallationReturnFlowActive = $isUninstallation;
 
             foreach ($usedMaterials as $itemPayload) {
+                if (! is_array($itemPayload) || empty($itemPayload['itemName'])) continue;
                 $item = InventoryItem::query()->where('name', $itemPayload['itemName'])->first();
                 if ($item) {
-                    $item->decrement('stock_available', $itemPayload['quantity']);
-                    $item->increment('stock_in_use', $itemPayload['quantity']);
-                    StockMovement::query()->create([
-                        'inventory_item_id' => $item->id,
-                        'movement_type' => 'out',
-                        'quantity' => $itemPayload['quantity'],
-                        'reference_type' => 'work_order',
-                        'reference_id' => $workOrder->id,
-                        'notes' => 'Material digunakan teknisi lapangan.',
-                    ]);
+                    $qty = max(1, (int) ($itemPayload['quantity'] ?? 1));
+                    if ($item->stock_available >= $qty) {
+                        $item->decrement('stock_available', $qty);
+                    } else {
+                        $item->update(['stock_available' => 0]);
+                    }
+                    $item->increment('stock_in_use', $qty);
+                    try {
+                        StockMovement::query()->create([
+                            'inventory_item_id' => $item->id,
+                            'movement_type' => 'out',
+                            'quantity' => $qty,
+                            'reference_type' => 'work_order',
+                            'reference_id' => $workOrder->id,
+                            'notes' => 'Material digunakan teknisi lapangan.',
+                        ]);
+                    } catch (\Throwable) {}
                 }
             }
 
@@ -990,7 +1038,7 @@ class WorkflowService
                     'installationPaymentMethod' => $isNewInstallation ? ($report['installation_payment_method'] ?? null) : null,
                     'installationPaymentCustomerPaid' => $isNewInstallation ? (bool) ($report['installation_payment_customer_paid'] ?? false) : null,
                     'customerBiodataConfirmed' => $isNewInstallation ? (bool) ($report['customer_biodata_confirmed'] ?? false) : null,
-                    'routerSn' => $isNewInstallation ? trim((string) ($report['router_sn'] ?? '')) : null,
+                    'routerSn' => $isNewInstallation ? trim((string) ($report['router_sn'] ?? $report['mac_address'] ?? '')) : null,
                     'removedItems' => $returnItems,
                     'signature' => $report['activation_signature'] ?? $report['signature'] ?? null,
                     'terms' => $report['activation_terms'] ?? null,
@@ -1024,43 +1072,44 @@ class WorkflowService
             ]);
 
             if ($workOrder->ticket_id) {
-                TroubleTicket::query()->whereKey($workOrder->ticket_id)->update([
-                    'status' => $isUninstallation ? 'menunggu_retur_gudang' : 'field_progress',
-                    'field_work_report' => [
-                        'actionTaken' => $report['action_taken'],
-                        'fieldActionType' => $fieldActionType,
-                        'rootCause' => $report['root_cause'] ?? null,
-                        'progressSummary' => $report['progress_summary'] ?? null,
-                        'resultSummary' => $report['result_summary'] ?? null,
-                        'patchCordReplaced' => $report['patch_cord_replaced'] ?? false,
-                        'dropCableLengthMeters' => $report['drop_cable_length_meters'] ?? null,
-                        'finalOpticalPowerDbm' => $report['final_optical_power_dbm'],
-                        'modemReplaced' => $replacementApplied || ($report['modem_replaced'] ?? false),
-                        'newOntSerialNumber' => $report['new_ont_serial_number'] ?? null,
-                        'photoKtp' => $report['photo_ktp'] ?? null,
-                        'photoOpticalPowerMeter' => $report['photo_optical_power_meter'] ?? null,
-                        'photoModemInstallation' => $report['photo_modem_installation'] ?? null,
-                        'photoInstallationResult' => $installationPhotoPath,
-                        'completedAt' => Carbon::now()->format('Y-m-d H:i:s'),
-                        'technicianSignature' => $report['signature'] ?? null,
-                        'returnItems' => $returnItems,
-                        'deviceReplacementApplied' => $replacementApplied,
-                    ],
-                    'replacement_context' => $isUninstallation
-                        ? array_merge(
-                            TroubleTicket::query()->whereKey($workOrder->ticket_id)->value('replacement_context') ?? [],
-                            [
+                $ticket = TroubleTicket::query()->find($workOrder->ticket_id);
+                if ($ticket) {
+                    $existingContext = is_array($ticket->replacement_context) ? $ticket->replacement_context : [];
+                    $ticket->update([
+                        'status' => $isUninstallation ? 'menunggu_retur_gudang' : 'field_progress',
+                        'field_work_report' => [
+                            'actionTaken' => $report['action_taken'],
+                            'fieldActionType' => $fieldActionType,
+                            'rootCause' => $report['root_cause'] ?? null,
+                            'progressSummary' => $report['progress_summary'] ?? null,
+                            'resultSummary' => $report['result_summary'] ?? null,
+                            'patchCordReplaced' => $report['patch_cord_replaced'] ?? false,
+                            'dropCableLengthMeters' => $report['drop_cable_length_meters'] ?? null,
+                            'finalOpticalPowerDbm' => $report['final_optical_power_dbm'],
+                            'modemReplaced' => $replacementApplied || ($report['modem_replaced'] ?? false),
+                            'newOntSerialNumber' => $report['new_ont_serial_number'] ?? null,
+                            'photoKtp' => $photoKtpPath,
+                            'photoOpticalPowerMeter' => $photoOpmPath,
+                            'photoModemInstallation' => $report['photo_modem_installation'] ?? null,
+                            'photoInstallationResult' => $installationPhotoPath,
+                            'completedAt' => Carbon::now()->format('Y-m-d H:i:s'),
+                            'technicianSignature' => $report['signature'] ?? null,
+                            'returnItems' => $returnItems,
+                            'deviceReplacementApplied' => $replacementApplied,
+                        ],
+                        'replacement_context' => $isUninstallation
+                            ? array_merge($existingContext, [
                                 'returnType' => 'uninstallation',
                                 'warehouseReturnStatus' => 'menunggu_qc_gudang',
                                 'holdTicketUntilWarehouseReturn' => true,
-                            ]
-                        )
-                        : TroubleTicket::query()->whereKey($workOrder->ticket_id)->value('replacement_context'),
-                ]);
+                            ])
+                            : $existingContext,
+                    ]);
+                }
             }
 
             if ($workOrder->type === 'maintenance' && $replacementApplied && $customer) {
-                $customerMeta = $customer->meta ?? [];
+                $customerMeta = is_array($customer->meta) ? $customer->meta : [];
                 $deviceHistory = is_array($customerMeta['deviceReplacementHistory'] ?? null)
                     ? $customerMeta['deviceReplacementHistory']
                     : [];
@@ -1105,9 +1154,10 @@ class WorkflowService
             }
 
             if ($workOrder->service_registration_id) {
-                ServiceRegistration::query()
-                    ->whereKey($workOrder->service_registration_id)
-                    ->update([
+                $registration = ServiceRegistration::query()->find($workOrder->service_registration_id);
+                if ($registration) {
+                    $regMeta = is_array($registration->meta) ? $registration->meta : [];
+                    $registration->update([
                         'status' => 'menunggu_qc_noc',
                         'activation_report' => [
                             'actionTaken' => $report['action_taken'],
@@ -1119,18 +1169,18 @@ class WorkflowService
                             'installationPaymentMethod' => $isNewInstallation ? ($report['installation_payment_method'] ?? null) : null,
                             'installationPaymentCustomerPaid' => $isNewInstallation ? (bool) ($report['installation_payment_customer_paid'] ?? false) : null,
                             'customerBiodataConfirmed' => $isNewInstallation ? (bool) ($report['customer_biodata_confirmed'] ?? false) : null,
-                            'routerSn' => $isNewInstallation ? trim((string) ($report['router_sn'] ?? '')) : null,
+                            'routerSn' => $isNewInstallation ? trim((string) ($report['router_sn'] ?? $report['mac_address'] ?? '')) : null,
                         ],
                         'activation_document' => [
                             'signature' => $report['activation_signature'] ?? $report['signature'] ?? null,
                             'terms' => $report['activation_terms'] ?? null,
                             'signedAt' => Carbon::now()->format('Y-m-d H:i:s'),
                         ],
-                        'meta' => array_merge(
-                            ServiceRegistration::query()->whereKey($workOrder->service_registration_id)->value('meta') ?? [],
-                            ['last_field_report_at' => Carbon::now()->format('Y-m-d H:i:s')]
-                        ),
+                        'meta' => array_merge($regMeta, [
+                            'last_field_report_at' => Carbon::now()->format('Y-m-d H:i:s'),
+                        ]),
                     ]);
+                }
             }
 
             $this->log($actor, 'Submitted Field Report', $workOrder->id, $report['action_taken'], 'success');

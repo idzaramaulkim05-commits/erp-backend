@@ -87,4 +87,14 @@ class WorkOrder extends Model
             'completed_at' => 'datetime',
         ];
     }
+
+    public function serviceRegistration()
+    {
+        return $this->belongsTo(ServiceRegistration::class, 'service_registration_id');
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class, 'customer_id');
+    }
 }

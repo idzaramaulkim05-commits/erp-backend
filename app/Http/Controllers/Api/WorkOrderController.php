@@ -16,7 +16,7 @@ class WorkOrderController extends Controller
 
     public function index()
     {
-        return WorkOrderResource::collection(WorkOrder::query()->latest()->get());
+        return WorkOrderResource::collection(WorkOrder::query()->with(['serviceRegistration', 'customer'])->latest()->get());
     }
 
     public function assignTech(AssignWorkOrderRequest $request, WorkOrder $workOrder)

@@ -857,60 +857,30 @@ class WorkflowService
     public function submitFieldReport(WorkOrder $workOrder, array $report, User $actor): WorkOrder
     {
         return DB::transaction(function () use ($workOrder, $report, $actor) {
-            $photoKtpPath = null;
-            if ($report['photo_ktp'] instanceof UploadedFile) {
-                try {
-                    $photoKtpPath = $report['photo_ktp']->store('work-orders/photos', 'public');
-                } catch (\Throwable) {
-                    $photoKtpPath = $report['photo_ktp']->getClientOriginalName();
+            $storeFile = function (mixed $file, string $directory): ?string {
+                if (empty($file)) {
+                    return null;
                 }
-            } else {
-                $photoKtpPath = $report['photo_ktp'] ?? null;
-            }
+                if (is_string($file)) {
+                    return $file;
+                }
+                if (is_object($file) && method_exists($file, 'store')) {
+                    try {
+                        return $file->store($directory, 'public');
+                    } catch (\Throwable) {
+                        if (method_exists($file, 'getClientOriginalName')) {
+                            return $file->getClientOriginalName();
+                        }
+                    }
+                }
+                return null;
+            };
 
-            $photoOdpPath = null;
-            if ($report['photo_odp'] instanceof UploadedFile) {
-                try {
-                    $photoOdpPath = $report['photo_odp']->store('work-orders/photos', 'public');
-                } catch (\Throwable) {
-                    $photoOdpPath = $report['photo_odp']->getClientOriginalName();
-                }
-            } else {
-                $photoOdpPath = $report['photo_odp'] ?? null;
-            }
-
-            $photoOpmPath = null;
-            if ($report['photo_optical_power_meter'] instanceof UploadedFile) {
-                try {
-                    $photoOpmPath = $report['photo_optical_power_meter']->store('work-orders/photos', 'public');
-                } catch (\Throwable) {
-                    $photoOpmPath = $report['photo_optical_power_meter']->getClientOriginalName();
-                }
-            } else {
-                $photoOpmPath = $report['photo_optical_power_meter'] ?? null;
-            }
-
-            $photoModemPath = null;
-            if ($report['photo_modem_identity'] instanceof UploadedFile) {
-                try {
-                    $photoModemPath = $report['photo_modem_identity']->store('work-orders/photos', 'public');
-                } catch (\Throwable) {
-                    $photoModemPath = $report['photo_modem_identity']->getClientOriginalName();
-                }
-            } else {
-                $photoModemPath = $report['photo_modem_identity'] ?? null;
-            }
-
-            $installationPhotoPath = null;
-            if ($report['photo_installation_result'] instanceof UploadedFile) {
-                try {
-                    $installationPhotoPath = $report['photo_installation_result']->store('work-orders/installation-photos', 'public');
-                } catch (\Throwable) {
-                    $installationPhotoPath = $report['photo_installation_result']->getClientOriginalName();
-                }
-            } else {
-                $installationPhotoPath = $report['photo_installation_result'] ?? null;
-            }
+            $photoKtpPath = $storeFile($report['photo_ktp'] ?? null, 'work-orders/photos');
+            $photoOdpPath = $storeFile($report['photo_odp'] ?? null, 'work-orders/photos');
+            $photoOpmPath = $storeFile($report['photo_optical_power_meter'] ?? null, 'work-orders/photos');
+            $photoModemPath = $storeFile($report['photo_modem_identity'] ?? null, 'work-orders/photos');
+            $installationPhotoPath = $storeFile($report['photo_installation_result'] ?? null, 'work-orders/installation-photos') ?? $photoModemPath;
 
             $usedMaterials = $report['used_materials'] ?? [];
             $returnItems = $this->normalizeWarehouseItems($report['return_items'] ?? []);
@@ -925,26 +895,34 @@ class WorkflowService
                 ));
             $isNewInstallation = $workOrder->type === 'installation';
             if ($isNewInstallation) {
+                $biodataConfirmed = filter_var($report['customer_biodata_confirmed'] ?? $workOrder->customer_biodata_confirmed, FILTER_VALIDATE_BOOLEAN);
                 abort_if(
-                    ! ($report['customer_biodata_confirmed'] ?? false),
+                    ! $biodataConfirmed,
                     422,
                     'Checklist konfirmasi biodata pelanggan wajib dicentang sebelum submit ke QC NOC.'
                 );
+
+                $macOrSn = trim((string) ($report['router_sn'] ?? $report['mac_address'] ?? $workOrder->router_sn ?? ''));
                 abort_if(
-                    trim((string) ($report['router_sn'] ?? $report['mac_address'] ?? '')) === '',
+                    $macOrSn === '',
                     422,
                     'SN / MAC address router wajib diisi untuk pasang baru.'
                 );
+
+                $paymentMethod = $report['installation_payment_method'] ?? $workOrder->installation_payment_method ?? 'tunai';
                 abort_if(
-                    ! in_array($report['installation_payment_method'] ?? null, ['tunai', 'transfer'], true),
+                    ! in_array($paymentMethod, ['tunai', 'transfer'], true),
                     422,
                     'Metode pembayaran biaya pemasangan wajib dipilih.'
                 );
+
+                $paymentPaid = filter_var($report['installation_payment_customer_paid'] ?? $workOrder->installation_payment_customer_paid ?? true, FILTER_VALIDATE_BOOLEAN);
                 abort_if(
-                    ! ($report['installation_payment_customer_paid'] ?? false),
+                    ! $paymentPaid,
                     422,
                     'Konfirmasi pembayaran pelanggan di lapangan wajib diisi sebelum submit.'
                 );
+
                 abort_if(
                     $workOrder->pppoe_request_status !== 'approved',
                     422,

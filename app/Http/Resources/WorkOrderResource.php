@@ -40,15 +40,15 @@ class WorkOrderResource extends JsonResource
             'installationPaymentMethod' => $this->installation_payment_method,
             'installationPaymentStatus' => $this->installation_payment_status,
             'installationPaymentCustomerPaid' => (bool) $this->installation_payment_customer_paid,
-            'installationPaymentConfirmedAt' => optional($this->installation_payment_confirmed_at)->format('Y-m-d H:i:s'),
+            'installationPaymentConfirmedAt' => $this->formatDate($this->installation_payment_confirmed_at),
             'installationPaymentConfirmedBy' => $this->installation_payment_confirmed_by,
             'installationPaymentNotes' => $this->installation_payment_notes,
             'customerBiodataConfirmed' => (bool) $this->customer_biodata_confirmed,
             'routerSn' => $this->router_sn,
             'pppoeRequestStatus' => $this->pppoe_request_status,
-            'pppoeRequestedAt' => optional($this->pppoe_requested_at)->format('Y-m-d H:i:s'),
+            'pppoeRequestedAt' => $this->formatDate($this->pppoe_requested_at),
             'pppoeRequestedBy' => $this->pppoe_requested_by,
-            'pppoeApprovedAt' => optional($this->pppoe_approved_at)->format('Y-m-d H:i:s'),
+            'pppoeApprovedAt' => $this->formatDate($this->pppoe_approved_at),
             'pppoeApprovedBy' => $this->pppoe_approved_by,
             'requiredMaterials' => $this->required_materials ?? [],
             'usedMaterials' => $this->used_materials ?? [],
@@ -62,12 +62,12 @@ class WorkOrderResource extends JsonResource
             'warehouseReturnRequestId' => $this->warehouse_return_request_id,
             'qcStatus' => $this->qc_status,
             'qcNotes' => $this->qc_notes,
-            'returnedToTechAt' => optional($this->returned_to_tech_at)->format('Y-m-d H:i:s'),
+            'returnedToTechAt' => $this->formatDate($this->returned_to_tech_at),
             'finalVerification' => $this->final_verification ?? new \stdClass(),
             'sopVerifiedByLead' => (bool) $this->sop_verified_by_lead,
             'nocActivated' => (bool) $this->noc_activated,
-            'createdAt' => optional($this->created_at)->format('Y-m-d H:i:s'),
-            'completedAt' => optional($this->completed_at)->format('Y-m-d H:i:s'),
+            'createdAt' => $this->formatDate($this->created_at),
+            'completedAt' => $this->formatDate($this->completed_at),
         ];
     }
 
@@ -104,5 +104,26 @@ class WorkOrderResource extends JsonResource
         }
 
         return Storage::disk('public')->url($value);
+    }
+
+    private function formatDate(mixed $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+
+        if (is_string($value)) {
+            try {
+                return \Illuminate\Support\Carbon::parse($value)->format('Y-m-d H:i:s');
+            } catch (\Throwable) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 }

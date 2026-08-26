@@ -31,7 +31,8 @@ class WorkOrderController extends Controller
 
     public function submitReport(SubmitFieldReportRequest $request, WorkOrder $workOrder)
     {
-        return WorkOrderResource::make($this->workflow->submitFieldReport($workOrder, $request->validated(), $request->user()));
+        $updated = $this->workflow->submitFieldReport($workOrder, $request->validated(), $request->user());
+        return WorkOrderResource::make($updated->load(['serviceRegistration', 'customer']));
     }
 
     public function submitInstallationReport(SubmitFieldReportRequest $request, WorkOrder $workOrder)

@@ -1724,7 +1724,7 @@ class WorkflowService
         abort_unless($request->status === 'pending_management', 422, 'Request procurement ini tidak sedang menunggu approval atasan.');
 
         $request->update([
-            'status' => 'approved',
+            'status' => 'pending_payment',
             'management_approval' => [
                 'approved' => true,
                 'by' => $actor->name,
@@ -1736,7 +1736,60 @@ class WorkflowService
             'last_rejected_at' => null,
         ]);
 
-        $this->log($actor, 'Management Approved Procurement', $request->id, $notes ?? 'Approved by management.', 'success');
+        $this->log($actor, 'Management Approved Procurement', $request->id, ($notes ?? 'Approved by management.').' Diteruskan ke Finance untuk konfirmasi pembayaran & lampiran bukti transfer.', 'success');
+
+        return $request->fresh();
+    }
+
+    public function confirmProcurementPayment(ProcurementRequest $request, User $actor, array $payload, mixed $paymentProofFile = null): ProcurementRequest
+    {
+        abort_unless(
+            in_array($request->status, ['pending_payment', 'pending_finance', 'approved'], true),
+            422,
+            'Status procurement tidak valid untuk konfirmasi pembayaran.'
+        );
+
+        $proofUrl = null;
+        if ($paymentProofFile) {
+            if (is_object($paymentProofFile) && method_exists($paymentProofFile, 'store')) {
+                try {
+                    $path = $paymentProofFile->store('procurements/proofs', 'public');
+                    $proofUrl = 'storage/'.$path;
+                } catch (\Throwable) {
+                    $proofUrl = method_exists($paymentProofFile, 'getClientOriginalName') ? $paymentProofFile->getClientOriginalName() : null;
+                }
+            }
+        } elseif (!empty($payload['payment_proof'])) {
+            $proofUrl = (string) $payload['payment_proof'];
+        }
+
+        abort_if(
+            empty($proofUrl) && empty($request->payment_proof_url),
+            422,
+            'Bukti pembayaran atau transfer kirim uang wajib dilampirkan.'
+        );
+
+        $finalProofUrl = $proofUrl ?: $request->payment_proof_url;
+        $paymentChannel = $payload['payment_channel'] ?? $request->payment_channel ?? 'Transfer Bank';
+        $paymentNotes = $payload['notes'] ?? $payload['payment_notes'] ?? $request->payment_notes ?? 'Uang sudah diserahkan / dibayarkan oleh Finance.';
+
+        $request->update([
+            'status' => 'approved',
+            'payment_confirmed_at' => Carbon::now(),
+            'payment_confirmed_by' => $actor->name,
+            'payment_proof_url' => $finalProofUrl,
+            'payment_channel' => $paymentChannel,
+            'payment_notes' => $paymentNotes,
+            'payment_details' => [
+                'confirmed_by' => $actor->name,
+                'confirmed_at' => Carbon::now()->format('Y-m-d H:i:s'),
+                'proof_url' => $finalProofUrl,
+                'channel' => $paymentChannel,
+                'notes' => $paymentNotes,
+            ],
+        ]);
+
+        $this->log($actor, 'Procurement Payment Confirmed', $request->id, sprintf('Finance (%s) telah mengonfirmasi pembayaran & melampirkan bukti transfer via %s.', $actor->name, $paymentChannel), 'success');
 
         return $request->fresh();
     }

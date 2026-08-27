@@ -101,6 +101,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('procurements/{procurement}/finance-reject', [ProcurementController::class, 'financeReject'])->middleware('role:superadmin,finance');
     Route::post('procurements/{procurement}/management-approve', [ProcurementController::class, 'managementApprove'])->middleware('role:superadmin,management');
     Route::post('procurements/{procurement}/management-reject', [ProcurementController::class, 'managementReject'])->middleware('role:superadmin,management');
+    Route::post('procurements/{procurement}/confirm-payment', [ProcurementController::class, 'confirmPayment'])->middleware('role:superadmin,finance');
     Route::post('procurements/{procurement}/mark-ordered', [ProcurementController::class, 'markOrdered'])->middleware('role:superadmin,inventory');
     Route::post('procurements/{procurement}/receive', [ProcurementController::class, 'receive'])->middleware('role:superadmin,inventory');
 

@@ -56,6 +56,25 @@ class ProcurementController extends Controller
         return ProcurementRequestResource::make($this->workflow->markProcurementOrdered($procurement, $request->user(), $request->string('notes')->toString() ?: null));
     }
 
+    public function confirmPayment(Request $request, ProcurementRequest $procurement)
+    {
+        $payload = $request->validate([
+            'payment_channel' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
+            'payment_notes' => ['nullable', 'string'],
+            'payment_proof' => ['nullable'],
+        ]);
+
+        return ProcurementRequestResource::make(
+            $this->workflow->confirmProcurementPayment(
+                $procurement,
+                $request->user(),
+                $payload,
+                $request->file('payment_proof') ?? $request->file('proof')
+            )
+        );
+    }
+
     public function receive(Request $request, ProcurementRequest $procurement)
     {
         return ProcurementRequestResource::make($this->workflow->receiveProcurement($procurement, $request->user()));

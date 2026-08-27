@@ -24,6 +24,12 @@ class ProcurementRequest extends Model
         'status',
         'finance_approval',
         'management_approval',
+        'payment_confirmed_at',
+        'payment_confirmed_by',
+        'payment_proof_url',
+        'payment_channel',
+        'payment_notes',
+        'payment_details',
         'ordered_by',
         'ordered_at',
         'ordered_notes',
@@ -40,11 +46,13 @@ class ProcurementRequest extends Model
             'unit_price' => 'integer',
             'total_amount' => 'integer',
             'requested_at' => 'datetime',
+            'payment_confirmed_at' => 'datetime',
             'ordered_at' => 'datetime',
             'last_rejected_at' => 'datetime',
             'received_at' => 'datetime',
             'finance_approval' => 'array',
             'management_approval' => 'array',
+            'payment_details' => 'array',
         ];
     }
 }

@@ -23,12 +23,15 @@ class WarehouseReturnRequestController extends Controller
     {
         $payload = $request->validate([
             'notes' => ['nullable', 'string'],
+            'condition' => ['nullable', 'string'],
+            'device_condition' => ['nullable', 'string'],
+            'items' => ['nullable', 'array'],
         ]);
 
         return WarehouseReturnRequestResource::make(
             $this->workflow->completeWarehouseReturnQc(
                 $warehouseReturnRequest,
-                $payload['notes'] ?? null,
+                $payload,
                 $request->user(),
             )
         );

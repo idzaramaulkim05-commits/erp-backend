@@ -1535,62 +1535,85 @@ class WorkflowService
         return $request->fresh();
     }
 
-    public function completeWarehouseReturnQc(WarehouseReturnRequest $returnRequest, ?string $notes, User $actor): WarehouseReturnRequest
+    public function completeWarehouseReturnQc(WarehouseReturnRequest $returnRequest, array|string|null $payloadOrNotes, User $actor): WarehouseReturnRequest
     {
-        return DB::transaction(function () use ($returnRequest, $notes, $actor) {
+        return DB::transaction(function () use ($returnRequest, $payloadOrNotes, $actor) {
             abort_unless($returnRequest->status === 'menunggu_qc_gudang', 422, 'Retur gudang ini sudah diproses.');
             $returnType = $returnRequest->return_type ?? 'replacement';
 
+            $notes = is_array($payloadOrNotes) ? ($payloadOrNotes['notes'] ?? null) : $payloadOrNotes;
+            $overallCondition = is_array($payloadOrNotes) ? ($payloadOrNotes['condition'] ?? $payloadOrNotes['device_condition'] ?? 'layak_pakai') : 'layak_pakai';
+            $isOverallReusable = in_array($overallCondition, ['layak_pakai', 'layak', 'reusable', 'good', 'true', true], true);
+
+            $updatedItems = [];
             foreach (($returnRequest->items ?? []) as $itemPayload) {
-                $itemName = (string) ($itemPayload['itemName'] ?? '');
-                $item = InventoryItem::query()->where('name', $itemName)->first();
+                $itemName = (string) ($itemPayload['itemName'] ?? $itemPayload['item_name'] ?? '');
+                $item = InventoryItem::query()->where('name', $itemName)->first()
+                    ?: InventoryItem::query()->where('name', 'like', "%{$itemName}%")->first()
+                    ?: InventoryItem::query()->where('category', 'ONT')->first();
+
+                $quantity = (int) ($itemPayload['quantity'] ?? 1);
+                $itemCondition = is_array($payloadOrNotes) ? ($itemPayload['condition'] ?? $overallCondition) : $overallCondition;
+                $isItemReusable = in_array($itemCondition, ['layak_pakai', 'layak', 'reusable', 'good', 'true', true], true);
+
+                $updatedItems[] = array_merge($itemPayload, [
+                    'qcCondition' => $isItemReusable ? 'layak_pakai' : 'rusak_tidak_layak',
+                    'conditionLabel' => $isItemReusable ? 'Layak Pakai (Masuk Stok)' : 'Rusak / Afkir (Tidak Masuk Stok)',
+                ]);
 
                 if (! $item) {
                     continue;
                 }
 
-                $quantity = (int) ($itemPayload['quantity'] ?? 0);
-                $returnCategory = (string) ($itemPayload['returnCategory'] ?? 'unused_replacement');
-
-                if (in_array($returnCategory, ['old_defective', 'returned_damaged'], true)) {
-                    $item->increment('stock_reserved', $quantity);
-                    if ($item->stock_in_use > 0) {
-                        $item->decrement('stock_in_use', min($quantity, $item->stock_in_use));
-                    }
-                } elseif ($returnCategory === 'missing') {
-                    if ($item->stock_in_use > 0) {
-                        $item->decrement('stock_in_use', min($quantity, $item->stock_in_use));
-                    }
-                } else {
+                if ($isItemReusable) {
+                    // Masuk ke stok tersedia
                     $item->increment('stock_available', $quantity);
                     if ($item->stock_in_use > 0) {
                         $item->decrement('stock_in_use', min($quantity, $item->stock_in_use));
                     }
-                }
 
-                StockMovement::query()->create([
-                    'inventory_item_id' => $item->id,
-                    'movement_type' => 'return',
-                    'quantity' => $quantity,
-                    'reference_type' => 'warehouse_return_request',
-                    'reference_id' => $returnRequest->id,
-                    'notes' => $notes ?: 'Retur perangkat maintenance selesai di-QC gudang.',
-                ]);
+                    StockMovement::query()->create([
+                        'inventory_item_id' => $item->id,
+                        'movement_type' => 'in',
+                        'quantity' => $quantity,
+                        'reference_type' => 'warehouse_return_request',
+                        'reference_id' => $returnRequest->id,
+                        'notes' => 'QC Retur: Perangkat LAYAK PAKAI. Stok bertambah kembali ke stok tersedia.',
+                    ]);
+                } else {
+                    // Tidak masuk ke stok tersedia (hanya dicatat afkir/rusak)
+                    if ($item->stock_in_use > 0) {
+                        $item->decrement('stock_in_use', min($quantity, $item->stock_in_use));
+                    }
+
+                    StockMovement::query()->create([
+                        'inventory_item_id' => $item->id,
+                        'movement_type' => 'defective',
+                        'quantity' => $quantity,
+                        'reference_type' => 'warehouse_return_request',
+                        'reference_id' => $returnRequest->id,
+                        'notes' => 'QC Retur: Perangkat RUSAK / TIDAK LAYAK. Tidak dimasukkan ke stok tersedia (afkir).',
+                    ]);
+                }
 
                 if (! empty($itemPayload['serialNumbers']) && is_array($itemPayload['serialNumbers'])) {
                     InventorySerial::query()
                         ->where('inventory_item_id', $item->id)
                         ->whereIn('sn', $itemPayload['serialNumbers'])
                         ->update([
-                            'status' => in_array($returnCategory, ['old_defective', 'returned_damaged', 'missing'], true) ? 'defective' : 'returned_reusable',
+                            'status' => $isItemReusable ? 'returned_reusable' : 'defective',
                             'assigned_tech' => null,
                         ]);
                 }
             }
 
+            $conditionBadge = $isOverallReusable ? '[Status QC: LAYAK PAKAI (Masuk Stok)]' : '[Status QC: RUSAK / TIDAK LAYAK (Tidak Masuk Stok)]';
+            $fullNotes = trim($conditionBadge . ($notes ? "\nCatatan: " . $notes : ''));
+
             $returnRequest->update([
                 'status' => 'retur_selesai',
-                'qc_notes' => $notes,
+                'items' => $updatedItems,
+                'qc_notes' => $fullNotes,
                 'received_by' => $actor->name,
                 'received_at' => Carbon::now(),
                 'closed_at' => Carbon::now(),
@@ -1624,7 +1647,7 @@ class WorkflowService
                 ]);
             }
 
-            $this->log($actor, 'Warehouse Return QC Completed', $returnRequest->id, $notes ?? ($returnType === 'uninstallation' ? 'QC retur uninstall selesai dan ticket ditutup.' : 'QC retur gudang selesai dan ticket ditutup.'), 'success');
+            $this->log($actor, 'Warehouse Return QC Completed', $returnRequest->id, sprintf('QC retur gudang selesai. %s. %s', $conditionBadge, $notes ?? ''), 'success');
 
             return $returnRequest->fresh();
         });

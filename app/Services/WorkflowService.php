@@ -1619,10 +1619,17 @@ class WorkflowService
     {
         $total = (int) $payload['quantity'] * (int) $payload['unit_price'];
 
+        $cleanItemName = trim((string) ($payload['item_name'] ?? ''));
+        $cleanItemName = preg_replace('/^(Material\s+Lainnya\s*(\/\s*Khusus)?\s*[-–—:\/]?\s*)/i', '', $cleanItemName);
+        $cleanItemName = trim((string) $cleanItemName);
+        if (empty($cleanItemName) || strtolower($cleanItemName) === 'material lainnya / khusus' || strtolower($cleanItemName) === 'material lainnya') {
+            $cleanItemName = trim((string) ($payload['item_code'] ?? 'Perangkat Baru'));
+        }
+
         $request = ProcurementRequest::query()->create([
             'id' => $this->generateUniqueId(ProcurementRequest::class, 'REQ', 1),
             'item_code' => $payload['item_code'],
-            'item_name' => $payload['item_name'],
+            'item_name' => $cleanItemName,
             'quantity' => $payload['quantity'],
             'unit' => $payload['unit'],
             'unit_price' => $payload['unit_price'],
@@ -1644,9 +1651,16 @@ class WorkflowService
 
         $total = (int) $payload['quantity'] * (int) $payload['unit_price'];
 
+        $cleanItemName = trim((string) ($payload['item_name'] ?? ''));
+        $cleanItemName = preg_replace('/^(Material\s+Lainnya\s*(\/\s*Khusus)?\s*[-–—:\/]?\s*)/i', '', $cleanItemName);
+        $cleanItemName = trim((string) $cleanItemName);
+        if (empty($cleanItemName) || strtolower($cleanItemName) === 'material lainnya / khusus' || strtolower($cleanItemName) === 'material lainnya') {
+            $cleanItemName = trim((string) ($payload['item_code'] ?? 'Perangkat Baru'));
+        }
+
         $request->update([
             'item_code' => $payload['item_code'],
-            'item_name' => $payload['item_name'],
+            'item_name' => $cleanItemName,
             'quantity' => $payload['quantity'],
             'unit' => $payload['unit'],
             'unit_price' => $payload['unit_price'],
@@ -1764,19 +1778,39 @@ class WorkflowService
         abort_unless($request->status === 'ordered', 422, 'Barang hanya bisa diterima setelah procurement ditandai sedang dibeli.');
 
         return DB::transaction(function () use ($request, $actor) {
+            $cleanItemName = trim((string) $request->item_name);
+            $cleanItemName = preg_replace('/^(Material\s+Lainnya\s*(\/\s*Khusus)?\s*[-–—:\/]?\s*)/i', '', $cleanItemName);
+            $cleanItemName = trim((string) $cleanItemName);
+            if (empty($cleanItemName) || strtolower($cleanItemName) === 'material lainnya / khusus' || strtolower($cleanItemName) === 'material lainnya') {
+                $cleanItemName = trim((string) $request->item_code);
+            }
+
             $inventory = InventoryItem::query()->firstOrCreate(
                 ['code' => $request->item_code],
                 [
                     'id' => 'INV-'.Str::upper(Str::random(6)),
-                    'name' => $request->item_name,
-                    'category' => 'ONT',
+                    'name' => $cleanItemName,
+                    'category' => 'Material Lapangan',
                     'brand' => 'Generic',
-                    'model' => $request->item_name,
+                    'model' => $cleanItemName,
                     'unit' => $request->unit,
                     'unit_price' => $request->unit_price,
                     'location_rack' => 'Gudang Utama',
+                    'min_threshold' => 10,
                 ]
             );
+
+            $existingRawName = trim((string) $inventory->name);
+            if (
+                $existingRawName === 'Material Lainnya / Khusus' ||
+                $existingRawName === 'Material Lainnya' ||
+                preg_match('/^(Material\s+Lainnya\s*(\/\s*Khusus)?\s*[-–—:\/]?\s*)/i', $existingRawName)
+            ) {
+                $inventory->update([
+                    'name' => $cleanItemName,
+                    'model' => $cleanItemName,
+                ]);
+            }
 
             $inventory->increment('stock_available', $request->quantity);
             StockMovement::query()->create([
@@ -1791,9 +1825,10 @@ class WorkflowService
             $request->update([
                 'status' => 'received',
                 'received_at' => Carbon::now(),
+                'item_name' => $cleanItemName,
             ]);
 
-            $this->log($actor, 'Procurement Received', $request->id, 'Stok gudang bertambah.', 'success');
+            $this->log($actor, 'Procurement Received', $request->id, sprintf('Stok barang "%s" bertambah %d %s ke gudang.', $cleanItemName, $request->quantity, $request->unit), 'success');
 
             return $request->fresh();
         });

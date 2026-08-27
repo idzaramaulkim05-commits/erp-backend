@@ -95,8 +95,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('warehouse-return-requests/{warehouseReturnRequest}/qc', [WarehouseReturnRequestController::class, 'qc'])->middleware('role:superadmin,inventory');
 
     Route::get('procurements', [ProcurementController::class, 'index']);
-    Route::post('procurements', [ProcurementController::class, 'store'])->middleware('role:superadmin,inventory');
-    Route::put('procurements/{procurement}', [ProcurementController::class, 'update'])->middleware('role:superadmin,inventory');
+    Route::post('procurements', [ProcurementController::class, 'store'])->middleware('role:superadmin,inventory,lead_tech,management,finance');
+    Route::put('procurements/{procurement}', [ProcurementController::class, 'update'])->middleware('role:superadmin,inventory,lead_tech,management,finance');
     Route::post('procurements/{procurement}/finance-approve', [ProcurementController::class, 'financeApprove'])->middleware('role:superadmin,finance');
     Route::post('procurements/{procurement}/finance-reject', [ProcurementController::class, 'financeReject'])->middleware('role:superadmin,finance');
     Route::post('procurements/{procurement}/management-approve', [ProcurementController::class, 'managementApprove'])->middleware('role:superadmin,management');

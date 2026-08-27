@@ -820,6 +820,21 @@ class WorkflowService
 
     public function assignWorkOrder(WorkOrder $workOrder, string $techId, User $actor): WorkOrder
     {
+        if ($workOrder->installation_material_request_id) {
+            $materialRequest = InstallationMaterialRequest::query()->find($workOrder->installation_material_request_id);
+            if ($materialRequest && $materialRequest->status === 'menunggu_persetujuan_gudang') {
+                abort(422, 'Gudang belum mengonfirmasi ketersediaan barang/material untuk WO ini.');
+            }
+        }
+
+        $pendingMaterialRequest = InstallationMaterialRequest::query()
+            ->where('work_order_id', $workOrder->id)
+            ->where('status', 'menunggu_persetujuan_gudang')
+            ->first();
+        if ($pendingMaterialRequest) {
+            abort(422, 'Gudang belum mengonfirmasi ketersediaan barang/material untuk WO ini.');
+        }
+
         $tech = User::query()->findOrFail($techId);
         $nextStatus = 'menunggu_konfirmasi_teknisi';
 
@@ -2030,14 +2045,16 @@ class WorkflowService
     {
         return collect($items)
             ->map(function (array $item): array {
+                $name = trim((string) ($item['itemName'] ?? $item['item_name'] ?? ''));
                 return [
-                    'itemName' => $item['itemName'] ?? $item['item_name'] ?? 'Perangkat',
+                    'itemName' => $name,
                     'quantity' => max(1, (int) ($item['quantity'] ?? 1)),
-                    'unit' => $item['unit'] ?? 'Unit',
+                    'unit' => trim((string) ($item['unit'] ?? 'Unit')) ?: 'Unit',
                     'returnCategory' => $item['returnCategory'] ?? $item['return_category'] ?? 'unused_replacement',
                     'serialNumbers' => is_array($item['serialNumbers'] ?? null) ? array_values($item['serialNumbers']) : [],
                 ];
             })
+            ->filter(fn (array $item) => $item['itemName'] !== '')
             ->values()
             ->all();
     }

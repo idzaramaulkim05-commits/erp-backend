@@ -33,6 +33,7 @@ class WorkOrderResource extends JsonResource
             'ticketId' => $this->ticket_id,
             'serviceRegistrationId' => $this->service_registration_id,
             'installationMaterialRequestId' => $this->installation_material_request_id,
+            'installationMaterialRequestStatus' => $this->installationMaterialRequest?->status,
             'status' => $this->status,
             'scheduledDate' => $this->scheduled_date,
             'packagePlan' => $this->package_plan,

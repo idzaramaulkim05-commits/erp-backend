@@ -97,4 +97,9 @@ class WorkOrder extends Model
     {
         return $this->belongsTo(Customer::class, 'customer_id');
     }
+
+    public function installationMaterialRequest()
+    {
+        return $this->belongsTo(InstallationMaterialRequest::class, 'installation_material_request_id');
+    }
 }

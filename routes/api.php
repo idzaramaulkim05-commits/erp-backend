@@ -131,16 +131,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // POP Inventory & Work Orders
     Route::get('pops', [PopController::class, 'index']);
-    Route::post('pops', [PopController::class, 'store'])->middleware('role:superadmin,noc,lead_tech,inventory');
+    Route::post('pops', [PopController::class, 'store'])->middleware('role:superadmin');
     Route::get('pops/{pop}', [PopController::class, 'show']);
-    Route::put('pops/{pop}', [PopController::class, 'update'])->middleware('role:superadmin,noc,lead_tech,inventory');
+    Route::put('pops/{pop}', [PopController::class, 'update'])->middleware('role:superadmin');
     Route::delete('pops/{pop}', [PopController::class, 'destroy'])->middleware('role:superadmin');
     Route::post('pops/{pop}/devices', [PopController::class, 'storeDevice'])->middleware('role:superadmin,noc,lead_tech,inventory');
     Route::put('pops/{pop}/devices/{device}', [PopController::class, 'updateDevice'])->middleware('role:superadmin,noc,lead_tech,inventory');
     Route::delete('pops/{pop}/devices/{device}', [PopController::class, 'destroyDevice'])->middleware('role:superadmin,noc');
 
     Route::get('pop-work-orders', [PopWorkOrderController::class, 'index']);
-    Route::post('pop-work-orders', [PopWorkOrderController::class, 'store'])->middleware('role:superadmin,noc,lead_tech');
+    Route::post('pop-work-orders', [PopWorkOrderController::class, 'store'])->middleware('role:superadmin,noc');
     Route::get('pop-work-orders/{popWorkOrder}', [PopWorkOrderController::class, 'show']);
     Route::post('pop-work-orders/{popWorkOrder}/assign-tech', [PopWorkOrderController::class, 'assignTech'])->middleware('role:superadmin,lead_tech');
     Route::post('pop-work-orders/{popWorkOrder}/start', [PopWorkOrderController::class, 'start'])->middleware('role:superadmin,field_tech,lead_tech');

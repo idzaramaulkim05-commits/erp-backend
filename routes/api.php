@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\AuthNavigationController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\EmployeePerformanceController;
 use App\Http\Controllers\Api\FinanceMutationController;
 use App\Http\Controllers\Api\FinancialLedgerController;
 use App\Http\Controllers\Api\InventoryController;
@@ -38,6 +39,7 @@ Route::prefix('auth')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
+        Route::post('profile', [AuthController::class, 'updateProfile']);
         Route::get('navigation', [AuthNavigationController::class, 'show']);
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('change-password', [AuthController::class, 'changePassword']);
@@ -150,6 +152,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('network-odps', [NetworkOdpController::class, 'index']);
     Route::get('dashboard', [DashboardController::class, 'index']);
+    Route::get('employee-performance', [EmployeePerformanceController::class, 'index'])->middleware('role:superadmin,management');
+    Route::get('employee-performance/{user}', [EmployeePerformanceController::class, 'show'])->middleware('role:superadmin,management');
     Route::get('users', [UserController::class, 'index']);
     Route::get('audit-logs', [AuditLogController::class, 'index']);
     Route::get('admin/master-data', [AdminMasterDataController::class, 'index']);

@@ -58,6 +58,54 @@ class AuthController extends Controller
         return UserResource::make($request->user());
     }
 
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $payload = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:32'],
+            'avatar' => ['nullable', 'string'],
+            'avatar_file' => ['nullable', 'image', 'max:5120'], // max 5MB
+            'current_password' => ['nullable', 'string'],
+            'new_password' => ['nullable', 'string', 'min:6'],
+        ]);
+
+        if (isset($payload['name'])) {
+            $user->name = $payload['name'];
+        }
+
+        if (array_key_exists('phone', $payload)) {
+            $user->phone = $payload['phone'];
+        }
+
+        if ($request->hasFile('avatar_file')) {
+            $path = $request->file('avatar_file')->store('avatars', 'public');
+            $user->avatar = asset('storage/' . $path);
+        } elseif (isset($payload['avatar'])) {
+            $user->avatar = $payload['avatar'];
+        }
+
+        // Handle password change within profile update if provided
+        if (!empty($payload['new_password'])) {
+            abort_unless(
+                !empty($payload['current_password']) && Hash::check($payload['current_password'], $user->password),
+                422,
+                'Password saat ini tidak cocok atau belum diisi.'
+            );
+            $user->password = $payload['new_password'];
+        }
+
+        $user->save();
+
+        $this->logAuthEvent($user->name, $user->role, 'Updated Profile', $user->email, 'Pengguna memperbarui informasi profil akun.', 'info');
+
+        return response()->json([
+            'message' => 'Profil berhasil diperbarui.',
+            'user' => UserResource::make($user->fresh()),
+        ]);
+    }
+
     public function logout(Request $request)
     {
         $user = $request->user();

@@ -19,6 +19,8 @@ use App\Http\Controllers\Api\FinancialLedgerController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InstallationMaterialRequestController;
 use App\Http\Controllers\Api\NetworkOdpController;
+use App\Http\Controllers\Api\PopController;
+use App\Http\Controllers\Api\PopWorkOrderController;
 use App\Http\Controllers\Api\ProcurementController;
 use App\Http\Controllers\Api\ReimbursementController;
 use App\Http\Controllers\Api\ServiceRegistrationController;
@@ -126,6 +128,25 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('tasks', [TaskController::class, 'index']);
     Route::post('tasks', [TaskController::class, 'store']);
     Route::patch('tasks/{task}/status', [TaskController::class, 'updateStatus']);
+
+    // POP Inventory & Work Orders
+    Route::get('pops', [PopController::class, 'index']);
+    Route::post('pops', [PopController::class, 'store'])->middleware('role:superadmin,noc,lead_tech,inventory');
+    Route::get('pops/{pop}', [PopController::class, 'show']);
+    Route::put('pops/{pop}', [PopController::class, 'update'])->middleware('role:superadmin,noc,lead_tech,inventory');
+    Route::delete('pops/{pop}', [PopController::class, 'destroy'])->middleware('role:superadmin');
+    Route::post('pops/{pop}/devices', [PopController::class, 'storeDevice'])->middleware('role:superadmin,noc,lead_tech,inventory');
+    Route::put('pops/{pop}/devices/{device}', [PopController::class, 'updateDevice'])->middleware('role:superadmin,noc,lead_tech,inventory');
+    Route::delete('pops/{pop}/devices/{device}', [PopController::class, 'destroyDevice'])->middleware('role:superadmin,noc');
+
+    Route::get('pop-work-orders', [PopWorkOrderController::class, 'index']);
+    Route::post('pop-work-orders', [PopWorkOrderController::class, 'store'])->middleware('role:superadmin,noc,lead_tech');
+    Route::get('pop-work-orders/{popWorkOrder}', [PopWorkOrderController::class, 'show']);
+    Route::post('pop-work-orders/{popWorkOrder}/assign-tech', [PopWorkOrderController::class, 'assignTech'])->middleware('role:superadmin,lead_tech');
+    Route::post('pop-work-orders/{popWorkOrder}/start', [PopWorkOrderController::class, 'start'])->middleware('role:superadmin,field_tech,lead_tech');
+    Route::post('pop-work-orders/{popWorkOrder}/submit-field-report', [PopWorkOrderController::class, 'submitFieldReport'])->middleware('role:superadmin,field_tech,lead_tech');
+    Route::post('pop-work-orders/{popWorkOrder}/noc-qc-approve', [PopWorkOrderController::class, 'nocQcApprove'])->middleware('role:superadmin,noc');
+    Route::post('pop-work-orders/{popWorkOrder}/noc-qc-reject', [PopWorkOrderController::class, 'nocQcReject'])->middleware('role:superadmin,noc');
 
     Route::get('network-odps', [NetworkOdpController::class, 'index']);
     Route::get('dashboard', [DashboardController::class, 'index']);

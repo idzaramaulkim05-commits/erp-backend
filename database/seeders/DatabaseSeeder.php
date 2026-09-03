@@ -14,5 +14,12 @@ class DatabaseSeeder extends Seeder
         if (app()->environment(['local', 'testing']) || (bool) env('APP_ENABLE_DEMO_SEED', false)) {
             $this->call(IomsDemoSeeder::class);
         }
+
+        $this->call([
+            MasterWilayahSeeder::class,
+            OltSeeder::class,
+            OdpSeeder::class,
+            ComprehensiveModulesSeeder::class,
+        ]);
     }
 }

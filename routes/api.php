@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AdminMappingController;
 use App\Http\Controllers\Api\AdminMasterDataController;
 use App\Http\Controllers\Api\AdminModuleController;
@@ -12,25 +13,42 @@ use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AuthNavigationController;
 use App\Http\Controllers\Api\AuditLogController;
+use App\Http\Controllers\Api\ComprehensiveTicketController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\CustomerPackageRequestController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DataSheetController;
 use App\Http\Controllers\Api\EmployeePerformanceController;
 use App\Http\Controllers\Api\FinanceMutationController;
 use App\Http\Controllers\Api\FinancialLedgerController;
-use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InstallationMaterialRequestController;
+use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\MasterWilayahController;
 use App\Http\Controllers\Api\NetworkOdpController;
+use App\Http\Controllers\Api\NetworkTelemetryController;
+use App\Http\Controllers\Api\OdpController;
+use App\Http\Controllers\Api\OltController;
+use App\Http\Controllers\Api\PaketController;
 use App\Http\Controllers\Api\PopController;
 use App\Http\Controllers\Api\PopWorkOrderController;
 use App\Http\Controllers\Api\ProcurementController;
 use App\Http\Controllers\Api\ReimbursementController;
+use App\Http\Controllers\Api\RouterController;
 use App\Http\Controllers\Api\ServiceRegistrationController;
+use App\Http\Controllers\Api\SettingController;
+use App\Http\Controllers\Api\SyncCheckController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\WarehouseController;
 use App\Http\Controllers\Api\WarehouseReturnRequestController;
+use App\Http\Controllers\Api\WebhookController;
 use App\Http\Controllers\Api\WorkOrderController;
 use Illuminate\Support\Facades\Route;
+
+// Public Webhooks
+Route::match(['get', 'post'], 'webhook/whatsapp', [WebhookController::class, 'handleWhatsApp']);
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
@@ -47,6 +65,151 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->group(function () {
+    // ==========================================
+    // MODULE 1: MIKROTIK & BACKBONE TELEMETRY
+    // ==========================================
+    Route::apiResource('routers', RouterController::class);
+    Route::post('routers/{id}/set-default', [RouterController::class, 'setDefault']);
+    Route::get('network/telemetry', [NetworkTelemetryController::class, 'telemetry']);
+    Route::get('network/traffic', [NetworkTelemetryController::class, 'traffic']);
+    Route::get('network/interfaces', [NetworkTelemetryController::class, 'routerInterfaces']);
+    Route::post('network/ping', [NetworkTelemetryController::class, 'ping']);
+    Route::post('network/ping-terminal', [NetworkTelemetryController::class, 'pingTerminal']);
+    Route::get('network/backbone', [NetworkTelemetryController::class, 'backbone']);
+    Route::get('network/pppoe/secrets', [NetworkTelemetryController::class, 'pelangganList']);
+    Route::post('network/pppoe/toggle-status', [NetworkTelemetryController::class, 'togglePelangganStatus']);
+    Route::post('network/pppoe/delete', [NetworkTelemetryController::class, 'deletePelanggan']);
+
+    // ==========================================
+    // MODULE 2: OLT GPON & EPON MONITORING
+    // ==========================================
+    Route::apiResource('olts', OltController::class);
+    Route::get('olts-telemetry', [OltController::class, 'telemetry']);
+    Route::post('olts/{id}/ping', [OltController::class, 'ping']);
+    Route::post('olts/{id}/sync', [OltController::class, 'sync']);
+    Route::post('olts/sync-all', [OltController::class, 'syncAll']);
+    Route::get('olts/{id}/onus', [OltController::class, 'onus']);
+    Route::post('olts/{id}/restart-onu', [OltController::class, 'restartOnu']);
+    Route::post('olts/{id}/delete-onu', [OltController::class, 'deleteOnu']);
+
+    // ==========================================
+    // MODULE 3: ODP DISTRIBUTION & GIS MAPPING
+    // ==========================================
+    Route::apiResource('odps', OdpController::class);
+    Route::post('odps/{id}/toggle-status', [OdpController::class, 'toggleStatus']);
+    Route::post('odps/import-kmz', [OdpController::class, 'importKmz']);
+
+    // ==========================================
+    // MODULE 4: PAKET LAYANAN INTERNET
+    // ==========================================
+    Route::apiResource('pakets', PaketController::class);
+    Route::post('pakets/{id}/toggle-status', [PaketController::class, 'toggleStatus']);
+    Route::get('pakets-mikrotik-profiles', [PaketController::class, 'getProfilesApi']);
+
+    // ==========================================
+    // MODULE 5: MASTER WILAYAH & GENERATOR ID
+    // ==========================================
+    Route::get('wilayah/all', [MasterWilayahController::class, 'all']);
+    Route::post('wilayah/generate-id', [MasterWilayahController::class, 'generateId']);
+
+    // ==========================================
+    // MODULE 6: DATASHEET 360 & GOOGLE SHEETS
+    // ==========================================
+    Route::get('datasheet/search', [DataSheetController::class, 'search']);
+    Route::get('datasheet/detail', [DataSheetController::class, 'detail']);
+    Route::get('datasheet/invoices', [DataSheetController::class, 'customerInvoices']);
+    Route::get('datasheet/lookup', [DataSheetController::class, 'lookup']);
+    Route::get('datasheet/suggestions', [DataSheetController::class, 'suggestions']);
+    Route::post('datasheet/sync', [DataSheetController::class, 'sync']);
+    Route::post('datasheet/upload-csv', [DataSheetController::class, 'uploadCsv']);
+    Route::post('datasheet/save', [DataSheetController::class, 'storeOrUpdate']);
+    Route::delete('datasheet/{id}', [DataSheetController::class, 'destroy']);
+    Route::get('sync-check/data', [SyncCheckController::class, 'index']);
+    Route::get('sync-check/export', [SyncCheckController::class, 'export']);
+
+    // ==========================================
+    // MODULE 7: BILLING & INVOICING BULANAN
+    // ==========================================
+    Route::get('invoices', [InvoiceController::class, 'invoiceIndex']);
+    Route::post('invoices', [InvoiceController::class, 'invoiceStore']);
+    Route::post('invoices/generate-monthly', [InvoiceController::class, 'invoiceGenerateMonthly']);
+    Route::post('invoices/{id}/pay', [InvoiceController::class, 'invoicePay']);
+    Route::post('invoices/bulk-pay', [InvoiceController::class, 'invoiceBulkPay']);
+    Route::post('invoices/{id}/toggle-isolir', [InvoiceController::class, 'invoiceToggleIsolir']);
+    Route::post('invoices/bulk-toggle-isolir', [InvoiceController::class, 'invoiceBulkToggleIsolir']);
+    Route::post('invoices/{id}/notes', [InvoiceController::class, 'invoiceUpdateNote']);
+    Route::delete('invoices/{id}', [InvoiceController::class, 'invoiceDestroy']);
+    Route::get('invoices/{id}/wa-template', [InvoiceController::class, 'invoiceWaTemplate']);
+    Route::post('invoices/{id}/send-wa', [InvoiceController::class, 'invoiceSendWa']);
+    Route::post('invoices/bulk-send-wa', [InvoiceController::class, 'invoiceBulkSendWa']);
+    Route::get('invoices/{id}/print', [InvoiceController::class, 'invoicePrint']);
+    Route::get('invoices-export-csv', [InvoiceController::class, 'invoiceExportCsv']);
+
+    // Customer Package Requests
+    Route::get('package-requests', [CustomerPackageRequestController::class, 'index']);
+    Route::post('package-requests', [CustomerPackageRequestController::class, 'store']);
+    Route::post('package-requests/{id}/approve', [CustomerPackageRequestController::class, 'approve']);
+    Route::post('package-requests/{id}/reject', [CustomerPackageRequestController::class, 'reject']);
+
+    // ==========================================
+    // MODULE 8: WAREHOUSE & INVENTARIS
+    // ==========================================
+    Route::get('warehouse/items', [WarehouseController::class, 'index']);
+    Route::post('warehouse/items', [WarehouseController::class, 'storeItem']);
+    Route::put('warehouse/items/{id}', [WarehouseController::class, 'updateItem']);
+    Route::delete('warehouse/items/{id}', [WarehouseController::class, 'deleteItem']);
+    Route::post('warehouse/items/{id}/adjust', [WarehouseController::class, 'adjustStock']);
+    Route::post('warehouse/requests', [WarehouseController::class, 'storeRequest']);
+    Route::post('warehouse/requests/{id}/approve-finance', [WarehouseController::class, 'approveFinance']);
+    Route::post('warehouse/requests/{id}/confirm-restock', [WarehouseController::class, 'confirmRestock']);
+    Route::post('warehouse/requests/{id}/approve-divisi', [WarehouseController::class, 'approveDivisiRequest']);
+    Route::post('warehouse/requests/{id}/reject-divisi', [WarehouseController::class, 'rejectDivisiRequest']);
+    Route::post('warehouse/requests/{id}/action-noc', [WarehouseController::class, 'actionNocFollowup']);
+    Route::delete('warehouse/requests/{id}', [WarehouseController::class, 'deleteRequest']);
+    Route::post('warehouse/returns/{id}/receive', [WarehouseController::class, 'receiveReturn']);
+    Route::post('warehouse/returns/{id}/reject', [WarehouseController::class, 'rejectReturn']);
+    Route::delete('warehouse/returns/{id}', [WarehouseController::class, 'deleteReturn']);
+    Route::delete('warehouse/mutations/{id}', [WarehouseController::class, 'deleteMutation']);
+    Route::get('warehouse/export', [WarehouseController::class, 'export']);
+
+    // ==========================================
+    // MODULE 9: TIKET GANGGUAN & PSB TERPADU
+    // ==========================================
+    Route::get('tickets/live-check', [ComprehensiveTicketController::class, 'liveTicketCheck']);
+    Route::post('tickets/scan-onu-ocr', [ComprehensiveTicketController::class, 'scanOnuPhoto']);
+    Route::get('comprehensive-tickets', [ComprehensiveTicketController::class, 'index']);
+    Route::post('comprehensive-tickets', [ComprehensiveTicketController::class, 'store']);
+    Route::get('comprehensive-tickets/{id}', [ComprehensiveTicketController::class, 'show']);
+    Route::post('comprehensive-tickets/{id}/validate-noc', [ComprehensiveTicketController::class, 'validateNoc']);
+    Route::post('comprehensive-tickets/{id}/dispatch-tl', [ComprehensiveTicketController::class, 'dispatchTl']);
+    Route::post('comprehensive-tickets/{id}/progress', [ComprehensiveTicketController::class, 'updateProgress']);
+    Route::post('comprehensive-tickets/{id}/resolve', [ComprehensiveTicketController::class, 'resolve']);
+    Route::post('comprehensive-tickets/{id}/assign-vlan', [ComprehensiveTicketController::class, 'assignVlanNoc']);
+    Route::post('comprehensive-tickets/{id}/psb-action', [ComprehensiveTicketController::class, 'psbAction']);
+    Route::post('comprehensive-tickets/{id}/close', [ComprehensiveTicketController::class, 'close']);
+    Route::delete('comprehensive-tickets/{id}', [ComprehensiveTicketController::class, 'destroy']);
+    Route::get('comprehensive-tickets-export', [ComprehensiveTicketController::class, 'export']);
+
+    // ==========================================
+    // MODULE 10: SETTINGS ISP & NOTIFIKASI
+    // ==========================================
+    Route::get('settings/isp', [SettingController::class, 'index']);
+    Route::post('settings/isp', [SettingController::class, 'updateIsp']);
+    Route::post('settings/test-router', [SettingController::class, 'testRouter']);
+    Route::post('settings/test-wa', [SettingController::class, 'testWa']);
+    Route::post('settings/test-telegram', [SettingController::class, 'testTelegram']);
+    Route::get('settings/wa-groups', [SettingController::class, 'getWaGroups']);
+
+    // ==========================================
+    // MODULE 11: ACTIVITY & SYSTEM LOGS
+    // ==========================================
+    Route::get('activity-logs/list', [ActivityLogController::class, 'index']);
+    Route::get('activity-logs/pppoe-stream', [ActivityLogController::class, 'pppoeLogs']);
+    Route::get('activity-logs/system-stream', [ActivityLogController::class, 'systemLogs']);
+
+    // ==========================================
+    // CORE SYSTEM & MANAGEMENT ROUTES
+    // ==========================================
     Route::get('customers', [CustomerController::class, 'index']);
     Route::post('customers/import/preview', [CustomerController::class, 'previewImport'])->middleware('role:superadmin');
     Route::post('customers/import/confirm', [CustomerController::class, 'confirmImport'])->middleware('role:superadmin');
@@ -131,7 +294,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('tasks', [TaskController::class, 'store']);
     Route::patch('tasks/{task}/status', [TaskController::class, 'updateStatus']);
 
-    // POP Inventory & Work Orders
     Route::get('pops', [PopController::class, 'index']);
     Route::post('pops', [PopController::class, 'store'])->middleware('role:superadmin');
     Route::get('pops/{pop}', [PopController::class, 'show']);
